@@ -1,7 +1,7 @@
 #!/bin/bash
 
-mkdir ../data/
-cd ../data/
+mkdir data
+cd data
 
 # Download BlogCatalog dataset
 wget -O blogcatalog.mat http://leitang.net/code/social-dimension/data/blogcatalog.mat
@@ -14,5 +14,3 @@ wget -O wikipedia.mat http://snap.stanford.edu/node2vec/POS.mat
 
 # Download Flickr dataser
 wget -O flickr.mat  http://leitang.net/code/social-dimension/data/flickr.mat
-
-cd ../src/
