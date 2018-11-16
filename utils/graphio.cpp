@@ -8,8 +8,8 @@
 #include<vector>
 
 Graph read_graph(std::string filename, std::string format){
-	if(format!="metis" && format!="mat" && format!="edgelist")
-		throw "Unknown format for graph";
+	//if(format!="metis" && format!="mat" && format!="edgelist")
+	//	throw "Unknown format for graph";
 
 	if(!format.compare("metis"))
 		return read_graph_from_metis(filename);
@@ -36,8 +36,8 @@ Graph read_graph_from_edgelist(std::string filename){
 	std::ifstream inFile;
 	inFile.open(filename);
 	
-	if(!inFile)
-		throw "unable to open i/p file";
+	//if(!inFile)
+	//	throw "unable to open i/p file";
 
 	std::string line;
 

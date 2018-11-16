@@ -7,5 +7,6 @@ class Graph
 		bool directed;
 		Graph(int);
 		void add_edge(int, int, float);
+		void print_degree();
 		void print_graph();
 };

@@ -22,14 +22,16 @@ Graph::Graph(int N)
 
 void Graph::add_edge(int i, int j, float weight=1.0)
 {
-	if( i > this->size || j > this->size)
-		throw "Cannot add edge. Invalid node.";
+	/* NOTE: This function should add ONLY one edge. Use this function twice to make the matrix symmetric */
 
+//	if( i > this->size || j > this->size)
+//		throw "Cannot add edge. Invalid node.";
+//
+//	if( adj[i * this->size + j] != 0 || adj[j * this->size + i] != 0)
+//		throw "Trying to add duplicate node. Verify dataset";
+//
 	this->adj[i * this->size + j] = weight;		
-	this->adj[j * this->size + i] = weight;
-
-	this->degree[j * this->size + i] += 1;
-	this->degree[i * this->size + j] += 1;
+	this->degree[i * this->size + i] += weight;
 
 	this->volume += weight;
 }
@@ -42,3 +44,14 @@ void Graph::print_graph()
 		std::cout << std::endl;
 	}
 }
+void Graph::print_degree()
+{
+	for(int i = 0; i < this->size; i++){
+		for(int j = 0; j < this->size; j++){
+			std::cout << this->degree[i * this->size + j] << " ";
+		}
+		std::cout << std::endl;
+	}
+}
+
+
