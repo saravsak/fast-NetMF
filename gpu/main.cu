@@ -39,10 +39,24 @@ int main ( void ){
 	std::cout<<"Printing degree matrix"<<std::endl;
 	g.print_degree();
 
+
+	// Initialize all host and device variables
+	double *D_device;
+	double *temp_device, *X, *X_device;
+	double *A_device;
+	
+	X = (double *)malloc(g.size * g.size * sizeof(double));
+	
+	cudaMalloc(&D_device, g.size * g.size * sizeof(double));
+	cudaMalloc(&X_device, g.size * g.size * sizeof(double));
+	cudaMalloc(&A_device, g.size * g.size * sizeof(double));
+	cudaMalloc(&temp_device, g.size * g.size * sizeof(double));
+
+	cudaMemset(X_device, 0, g.size * g.size * sizeof(double));
+	cudaMemset(temp_device, 0, g.size * g.size * sizeof(double));
+
 	/* Compute D = D^{-1/2} */
 	// Create and allocate device variable to hold degree matrix
-	double *D_device;
-	cudaMalloc(&D_device, g.size * g.size * sizeof(double));
 
 	// Copy degree matrix to device
 	cudaMemcpy(D_device, g.degree, g.size * g.size * sizeof(double), cudaMemcpyHostToDevice);	
@@ -66,20 +80,7 @@ int main ( void ){
 
 	/* Compute X = D^{-1/2}AD^{-1/2} */
 	// Declare and allocate X matrix
-	double *temp_device, *X, *X_device;
 
-	X = (double *)malloc(g.size * g.size * sizeof(double));
-	
-	cudaMalloc(&X_device, g.size * g.size * sizeof(double));
-	cudaMalloc(&temp_device, g.size * g.size * sizeof(double));
-
-
-	cudaMemset(X_device, 0, g.size * g.size * sizeof(double));
-	cudaMemset(temp_device, 0, g.size * g.size * sizeof(double));
-
-	// Declare and allocate adjacency matrix on device
-	double *A_device;
-	cudaMalloc(&A_device, g.size * g.size * sizeof(double));
 
 	// Copy A and D to device 
 	cudaMemcpy(D_device, g.degree, g.size * g.size * sizeof(double), cudaMemcpyHostToDevice);	
