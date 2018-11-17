@@ -53,5 +53,11 @@ void Graph::print_degree()
 		std::cout << std::endl;
 	}
 }
-
+void Graph::info(){
+	std::cout<<"**********************************"<<std::endl;
+	std::cout<<"Number of nodes: "<<this->size<<std::endl;
+	std::cout<<"Number of edges: "<<std::endl;
+	std::cout<<"Sparsity: "<<num_edges/((float)this->size)<<std::endl;
+	std::cout<<"**********************************"<<std::endl;
+}
 
