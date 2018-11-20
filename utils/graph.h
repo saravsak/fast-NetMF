@@ -2,7 +2,7 @@
 class Graph
 {
 	public:
-		double *adj, *degree, volume;
+		float *adj, *degree, volume;
 		int size;
 		float num_edges;
 		bool directed;
