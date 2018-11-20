@@ -1,6 +1,5 @@
 /* 
 TODO: 
-1. Change all doubles to float 
 2. USe cuBlas for addition
 */
 
@@ -21,7 +20,7 @@ Question for prof
 #include "../utils/graph.h"
 #include "../utils/graphio.h"
 
-__global__ void compute_d(double* deg, int size){
+__global__ void compute_d(float* deg, int size){
 	int id = blockIdx.x * blockDim.x + threadIdx.x;
 	
 	if(id >= size) return;
@@ -32,7 +31,7 @@ __global__ void compute_d(double* deg, int size){
 	deg[id] = sqrt(1/deg[id]); 
 }
 
-__global__ void compute_s(double* S, double* X, int size){
+__global__ void compute_s(float* S, float* X, int size){
 	int id = blockIdx.x * blockDim.x + threadIdx.x;
 
 	if(id >= size * size) return;
@@ -40,7 +39,7 @@ __global__ void compute_s(double* S, double* X, int size){
 	S[id] += X[id]; 
 }
 
-__global__ void transform_s(double* S, int volume, int window_size, int b, int size){
+__global__ void transform_s(float* S, int volume, int window_size, int b, int size){
 	int id = blockIdx.x * blockDim.x + threadIdx.x;
 
 	if(id >= size * size) return;
@@ -48,7 +47,7 @@ __global__ void transform_s(double* S, int volume, int window_size, int b, int s
 	S[id] = (S[id] * float(volume))/ ((float) window_size * (float) b); 
 }
 
-__global__ void transform_m(double* M, int size){
+__global__ void transform_m(float* M, int size){
 	int id = blockIdx.x * blockDim.x + threadIdx.x;
 
 	if(id >= size * size) return;
@@ -56,12 +55,23 @@ __global__ void transform_m(double* M, int size){
 	M[id] =logf(M[id] > 1?M[id]:1);
 }
 
-__global__ void sqrt_si(double* S, int size){
+__global__ void sqrt_si(float* S, int size){
 	int id = blockIdx.x * blockDim.x + threadIdx.x;
 
 	if(id >= size) return;
 	
 	S[id] = sqrt((float) S[id]);
+}
+
+void print_matrix(float* S, int size){
+	std::cout<<std::endl<<std::endl;
+	for(int i=0;i<size;i++){
+		for(int j=0;j<size;j++){
+			std::cout<<S[i*size + j]<<" ";
+		}
+		std::cout<<std::endl;
+	}
+
 }
 
 
@@ -81,30 +91,60 @@ int main ( void ){
 	/* cuBlas housekeeping */	
 	cublasHandle_t handle;
 	cublasCreate(&handle);
-	double al=1.0f;
-	double bet=1.0f;
+	float al=1.0f;
+	float bet=1.0f;
+
+	/* cuSolver housekeepinh */
+	int lwork = 0;
+	signed char jobu = 'A';
+	signed char jobvt = 'N';
+	float *d_work, *d_rwork;
+	int *devInfo;
+	
+	cudaMalloc(&devInfo, sizeof(int));
+	cusolverDnHandle_t cusolverH;
+	cusolverDnCreate(&cusolverH);
+	cusolverDnSgesvd_bufferSize(cusolverH,g.size, g.size,&lwork);
+	cudaMalloc(&d_work, sizeof(float) * lwork);
+	cudaMalloc(&d_rwork, sizeof(float) *( g.size - 1));
 
 	/* Initialize and allocate variables */
 	// HOST
-	double *X;
-	double *S;
-	double *M;
+	float *U, *VT, *Si, *W;
+	float *X;
+	float *S;
+	float *M;
 	
-	int window_size = 10;
-	int size = g.size * g.size * sizeof(double);
+	int window_size = 2;
+	int size = g.size * g.size * sizeof(float);
 	int b = 1;
 	int dimension = 2;
+	int *devInfoH;
 	
-	X = (double *)malloc(size);
-	S = (double *)malloc(size);
-	M = (double *)malloc(size);	
+	X = (float *)malloc(size);
+	S = (float *)malloc(size);
+	M = (float *)malloc(size);	
+	U = (float*)malloc(size);
+	VT = (float*)malloc(size);
+	W = (float*)malloc(size);
+	Si = (float*)malloc(g.size * sizeof(float));
+	devInfoH = (int *)malloc(sizeof(int));
 
 	// DEVICE
-	double *D_device;
-	double *temp_device, *temp1_device, *X_device;
-	double *A_device;
-	double *S_device;
-	double *M_device;
+	float *D_device;
+	float *temp_device;
+	float *temp1_device;
+	float *X_device;
+	float *A_device;
+	float *S_device;
+	float *M_device;
+	float *U_device, *VT_device, *Si_device;
+	float *W_device; //auxillary device array
+
+	cudaMalloc(&U_device, size);
+	cudaMalloc(&Si_device, g.size * sizeof(float));
+	cudaMalloc(&VT_device, size);
+	cudaMalloc(&W_device, size);
 
 	cudaMalloc(&D_device, size);
 	cudaMalloc(&A_device, size);
@@ -132,7 +172,7 @@ int main ( void ){
 
 	/* Compute X = D^{-1/2}AD^{-1/2} */
 
-	cublasDgemm(handle, 
+	cublasSgemm(handle, 
 		    CUBLAS_OP_N, CUBLAS_OP_N, 
 		    g.size, g.size, g.size,
 		    &al,
@@ -141,7 +181,7 @@ int main ( void ){
 		    &bet, 
 		    temp_device, g.size);
 	
-	cublasDgemm(handle, 
+	cublasSgemm(handle, 
 		    CUBLAS_OP_N, CUBLAS_OP_N, 
 		    g.size, g.size, g.size,
 		    &al,
@@ -153,11 +193,14 @@ int main ( void ){
 	/* Compute S = sum(X^{0}....X^{window_size}) */
 	
 	// This might be too slow. Experiment to see if you can use a custom kernel 
+	cudaMemcpy(X, X_device, size, cudaMemcpyDeviceToHost);
+	print_matrix(X, g.size);
+
 	cudaMemcpy(S_device, X_device, size, cudaMemcpyDeviceToDevice);
 	cudaMemcpy(temp_device, X_device, size, cudaMemcpyDeviceToDevice);
 
 	for(int i=2;i<=window_size;i++){
-		cublasDgemm(handle, 
+		cublasSgemm(handle, 
 		    CUBLAS_OP_N, CUBLAS_OP_N, 
 		    g.size, g.size, g.size,
 		    &al,
@@ -175,19 +218,13 @@ int main ( void ){
 	// Compute S = S * (vol / (window_size * b))
 	transform_s<<<grid,threads>>>(S_device,g.volume, window_size, b, g.size);
 	cudaMemcpy(S, S_device, size, cudaMemcpyDeviceToHost);
-	
-	std::cout<<std::endl<<std::endl;
-	for(int i=0;i<g.size;i++){
-		for(int j=0;j<g.size;j++){
-			std::cout<<S[i*g.size + j]<<" ";
-		}
-		std::cout<<std::endl;
-	}
+
+        print_matrix(S, g.size);
 	
 	// Compute M = D^{-1/2} * S * D^{-1/2}
 	cudaMemset(temp_device, 0, size); 
 
-	cublasDgemm(handle, 
+	cublasSgemm(handle, 
 	    CUBLAS_OP_N, CUBLAS_OP_N, 
 	    g.size, g.size, g.size,
 	    &al,
@@ -196,7 +233,7 @@ int main ( void ){
 	    &bet, 
 	    temp_device, g.size);
 
-	cublasDgemm(handle, 
+	cublasSgemm(handle, 
 	    CUBLAS_OP_N, CUBLAS_OP_N, 
 	    g.size, g.size, g.size,
 	    &al,
@@ -209,69 +246,85 @@ int main ( void ){
 	transform_m<<<grid,threads>>>(M_device, g.size);
 	cudaMemcpy(M, M_device, size, cudaMemcpyDeviceToHost);
 
+        print_matrix(M, g.size);
+
 	// Perform SVD on M
-	double *U, *VT, *Si;
-	U = (double*)malloc(size);
-	VT = (double*)malloc(size);
-	Si = (double*)malloc(g.size * sizeof(double));
-
-	double *U_device, *VT_device, *Si_device;
-	double *W_device; //auxillary device array
-
-	cusolverDnHandle_t cusolverH;
-
-
-	cudaMalloc(&U_device, size);
-	cudaMalloc(&Si_device, g.size * sizeof(double));
-	cudaMalloc(&VT_device, size);
-	cudaMalloc(&W_device, size);
-
-	int lwork = 0;
-	double *d_work, *d_rwork;
-
-	cusolverDnDgesvd_bufferSize(cusolverH,g.size, g.size,&lwork);
-	cudaMalloc(&d_work, sizeof(double) * lwork);
-
-	signed char jobu = 'A';
-	signed char jobvt = 'A';
-	int *devInfo;
-
-	cusolverDnDgesvd(cusolverH, jobu, jobvt, 
-			g.size, g.size, A_device, 
-			g.size, Si_device, 
+	cusolverDnSgesvd(cusolverH, jobu, jobvt, 
+			g.size, g.size, M_device, g.size, 
+			Si_device, 
 			U_device, g.size, 
 			VT_device, g.size, 
-			d_work, lwork, d_rwork, devInfo); 
+			d_work, 
+			lwork, 
+			d_rwork, 
+			devInfo); 
 	
-	cudaDeviceSynchronize();
+	cudaMemcpy(U, U_device, size, cudaMemcpyDeviceToHost);
+	print_matrix(U, g.size);	
+	
+	cudaMemcpy(Si, Si, sizeof(float) * g.size, cudaMemcpyDeviceToHost);
+	std::cout<<std::endl<<std::endl;
+	for(int i=0;i<g.size;i++){
+		std::cout<<Si[i]<<" ";
+	}
+
+	cudaMemcpy(devInfoH, devInfo, sizeof(int), cudaMemcpyDeviceToHost);
+
+	std::cout<<"\nDev Info:"<<*devInfoH<<std::endl;
+
+	std::cout<<std::endl<<std::endl;
 	
 	// TODO: Clip vector to be of dimension D.
 
 	sqrt_si<<<grid, threads>>>(Si_device, g.size);	
-	cublasDdgmm(handle, 
+	cublasSdgmm(handle, 
 	    CUBLAS_SIDE_LEFT, 
 	    g.size, g.size,
 	    U_device, g.size,
 	    Si_device,1, 
 	    W_device,  g.size);
+
+
+	cudaMemcpy(W, W_device, size, cudaMemcpyDeviceToHost);
 	
+	std::cout<<std::endl<<std::endl;
+	for(int i=0;i<g.size;i++){
+		for(int j=0;j<g.size;j++){
+			std::cout<<W[i*g.size + j]<<" ";
+		}
+		std::cout<<std::endl;
+	}
 	
+	std::cout<<"Done"<<std::endl<<std::endl;
 	/***********
 	* Clean up *
 	***********/
 
-	//free(g);
+	free(X);
+	free(S);
+	free(M);
+	
+	free(U); 
+	free(VT);
+	free(Si);
+	free(W);
 
-	//cudaFree(D_device);
+	// DEVICE
+	cudaFree(D_device);
+	cudaFree(temp_device); 
+	cudaFree(temp1_device); 
+	cudaFree(X_device);
+	cudaFree(A_device);
+	cudaFree(S_device);
+	cudaFree(M_device);
 
-	// Function to print matrix
-/*
-	std::cout<<std::endl<<std::endl;
-	for(int i=0;i<g.size;i++){
-		for(int j=0;j<g.size;j++){
-			std::cout<<S[i*g.size + j]<<" ";
-		}
-		std::cout<<std::endl;
-	}
-*/
+	cudaFree(U_device);
+	cudaFree(VT_device); 
+	cudaFree(Si_device);
+	cudaFree(W_device); //auxillary device array
+
+	cudaFree(d_work);
+	cudaFree(d_rwork);
+	cudaFree(devInfo);
+
 }
