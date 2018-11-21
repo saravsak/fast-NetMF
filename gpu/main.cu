@@ -1,5 +1,6 @@
 /* 
 TODO: 
+1. Change thread architecture
 2. USe cuBlas for addition
 */
 
@@ -82,8 +83,10 @@ int main ( void ){
 	**************/
 	
 	/* Load graph */
-	Graph g =  read_graph("../data/test/small_test.csv","edgelist");
+        std::cout<<"Reading data from file"<<std::endl;
+	Graph g =  read_graph("../data/blogcatalog/edges.csv","edgelist");
 
+        std::cout<<"Initializing"<<std::endl;
 	/* CUDA housekeeping */
 	dim3 threads(128);
 	dim3 grid((int)ceil((float)g.size/128));
@@ -115,10 +118,10 @@ int main ( void ){
 	float *S;
 	float *M;
 	
-	int window_size = 2;
+	int window_size = 10;
 	int size = g.size * g.size * sizeof(float);
 	int b = 1;
-	int dimension = 2;
+	int dimension = 128;
 	int *devInfoH;
 	
 	X = (float *)malloc(size);
@@ -138,6 +141,7 @@ int main ( void ){
 	float *A_device;
 	float *S_device;
 	float *M_device;
+	float *M_temp_device;
 	float *U_device, *VT_device, *Si_device;
 	float *W_device; //auxillary device array
 
@@ -153,25 +157,29 @@ int main ( void ){
 	cudaMalloc(&temp1_device, size);
 	cudaMalloc(&S_device, size);
 	cudaMalloc(&M_device, size);
+	cudaMalloc(&M_temp_device, size);
 
 	cudaMemset(A_device, 0, size);
 	cudaMemset(D_device, 0, size);
 	cudaMemset(X_device, 0, size);
 	cudaMemset(S_device, 0, size);
 	cudaMemset(M_device, 0, size);
+	cudaMemset(M_temp_device, 0, size);
 	cudaMemset(temp_device, 0, size);
 	cudaMemset(temp1_device, 0, size);
 
 	/* Copy necessary variables to device */
+	std::cout<<"Moving data to device"<<std::endl;
 	cudaMemcpy(D_device, g.degree, size, cudaMemcpyHostToDevice);	
 	cudaMemcpy(A_device, g.adj, size , cudaMemcpyHostToDevice);	
 
 	/* Compute D = D^{-1/2} */
+	std::cout<<"Computing normalized D"<<std::endl;
 	compute_d<<<grid, threads>>>(D_device, g.size);
 	cudaDeviceSynchronize();
 
 	/* Compute X = D^{-1/2}AD^{-1/2} */
-
+	std::cout<<"Computing X"<<std::endl;
 	cublasSgemm(handle, 
 		    CUBLAS_OP_N, CUBLAS_OP_N, 
 		    g.size, g.size, g.size,
@@ -180,7 +188,7 @@ int main ( void ){
 		    D_device, g.size,
 		    &bet, 
 		    temp_device, g.size);
-	
+	cudaDeviceSynchronize();	
 	cublasSgemm(handle, 
 		    CUBLAS_OP_N, CUBLAS_OP_N, 
 		    g.size, g.size, g.size,
@@ -189,17 +197,19 @@ int main ( void ){
 	            temp_device,g.size, 
 		    &bet, 
 		    X_device, g.size);
+	cudaDeviceSynchronize();	
 	
 	/* Compute S = sum(X^{0}....X^{window_size}) */
 	
 	// This might be too slow. Experiment to see if you can use a custom kernel 
-	cudaMemcpy(X, X_device, size, cudaMemcpyDeviceToHost);
-	print_matrix(X, g.size);
+	//cudaMemcpy(X, X_device, size, cudaMemcpyDeviceToHost);
+	//print_matrix(X, g.size);
 
 	cudaMemcpy(S_device, X_device, size, cudaMemcpyDeviceToDevice);
 	cudaMemcpy(temp_device, X_device, size, cudaMemcpyDeviceToDevice);
 
 	for(int i=2;i<=window_size;i++){
+		std::cout<<"Computing X^"<<i<<std::endl;
 		cublasSgemm(handle, 
 		    CUBLAS_OP_N, CUBLAS_OP_N, 
 		    g.size, g.size, g.size,
@@ -211,19 +221,23 @@ int main ( void ){
 		
 		// Use cublas addition functions
 		compute_s<<<grid, threads>>>(S_device, temp1_device, g.size);
-		cudaMemcpy(temp_device, temp1_device, size, cudaMemcpyDeviceToDevice);
+		//cudaMemcpy(temp_device, temp1_device, size, cudaMemcpyDeviceToDevice);
+		cudaDeviceSynchronize();
 		cudaMemset(temp1_device,0,size);
 	}
 
 	// Compute S = S * (vol / (window_size * b))
+	std::cout<<"Transforming S"<<std::endl;
 	transform_s<<<grid,threads>>>(S_device,g.volume, window_size, b, g.size);
-	cudaMemcpy(S, S_device, size, cudaMemcpyDeviceToHost);
+	//cudaMemcpy(S, S_device, size, cudaMemcpyDeviceToHost);
+        cudaDeviceSynchronize();
 
-        print_matrix(S, g.size);
+        //print_matrix(S, g.size);
 	
 	// Compute M = D^{-1/2} * S * D^{-1/2}
 	cudaMemset(temp_device, 0, size); 
 
+	std::cout<<"Computing M"<<std::endl;
 	cublasSgemm(handle, 
 	    CUBLAS_OP_N, CUBLAS_OP_N, 
 	    g.size, g.size, g.size,
@@ -232,6 +246,7 @@ int main ( void ){
 	    D_device,g.size, 
 	    &bet, 
 	    temp_device, g.size);
+        cudaDeviceSynchronize();
 
 	cublasSgemm(handle, 
 	    CUBLAS_OP_N, CUBLAS_OP_N, 
@@ -241,14 +256,17 @@ int main ( void ){
 	    temp_device,g.size, 
 	    &bet, 
 	    M_device, g.size);
+        cudaDeviceSynchronize();
 		
 	// Compute M = log(max(Mi,1))
+	std::cout<<"Transforming M"<<std::endl;
 	transform_m<<<grid,threads>>>(M_device, g.size);
-	cudaMemcpy(M, M_device, size, cudaMemcpyDeviceToHost);
+        cudaDeviceSynchronize();
 
-        print_matrix(M, g.size);
-
+	// Do need to transpose M, since M is symmetric matrix
+	
 	// Perform SVD on M
+	std::cout<<"SVD"<<std::endl;
 	cusolverDnSgesvd(cusolverH, jobu, jobvt, 
 			g.size, g.size, M_device, g.size, 
 			Si_device, 
@@ -259,41 +277,46 @@ int main ( void ){
 			d_rwork, 
 			devInfo); 
 	
-	cudaMemcpy(U, U_device, size, cudaMemcpyDeviceToHost);
-	print_matrix(U, g.size);	
+	//cudaMemcpy(U, U_device, size, cudaMemcpyDeviceToHost);
+	//print_matrix(U, g.size);	
+	//cudaMemcpy(VT, VT_device, size, cudaMemcpyDeviceToHost);
+	//print_matrix(VT, g.size);	
+        cudaDeviceSynchronize();
 	
-	cudaMemcpy(Si, Si, sizeof(float) * g.size, cudaMemcpyDeviceToHost);
-	std::cout<<std::endl<<std::endl;
-	for(int i=0;i<g.size;i++){
-		std::cout<<Si[i]<<" ";
-	}
+	//cudaMemcpy(Si, Si_device, sizeof(float) * g.size, cudaMemcpyDeviceToHost);
+	//std::cout<<std::endl<<std::endl;
+	//for(int i=0;i<g.size;i++){
+	//	std::cout<<Si[i]<<" ";
+	//}
 
-	cudaMemcpy(devInfoH, devInfo, sizeof(int), cudaMemcpyDeviceToHost);
+	//cudaMemcpy(devInfoH, devInfo, sizeof(int), cudaMemcpyDeviceToHost);
 
-	std::cout<<"\nDev Info:"<<*devInfoH<<std::endl;
+	//std::cout<<"\nDev Info:"<<*devInfoH<<std::endl;
 
-	std::cout<<std::endl<<std::endl;
+	//std::cout<<std::endl<<std::endl;
 	
-	// TODO: Clip vector to be of dimension D.
+	std::cout<<"Transforming Si"<<std::endl;
+	sqrt_si<<<grid, threads>>>(Si_device, dimension);	
+        cudaDeviceSynchronize();
 
-	sqrt_si<<<grid, threads>>>(Si_device, g.size);	
+	std::cout<<"Computing W"<<std::endl;
 	cublasSdgmm(handle, 
 	    CUBLAS_SIDE_LEFT, 
-	    g.size, g.size,
+	    g.size, dimension,
 	    U_device, g.size,
 	    Si_device,1, 
-	    W_device,  g.size);
-
+	    W_device, g.size);
+        cudaDeviceSynchronize();
 
 	cudaMemcpy(W, W_device, size, cudaMemcpyDeviceToHost);
 	
 	std::cout<<std::endl<<std::endl;
-	for(int i=0;i<g.size;i++){
-		for(int j=0;j<g.size;j++){
-			std::cout<<W[i*g.size + j]<<" ";
-		}
-		std::cout<<std::endl;
-	}
+	//for(int i=0;i<dimension;i++){
+	//	for(int j=0;j<g.size;j++){
+	//		std::cout<<W[i*g.size + j]<<" ";
+	//	}
+	//	std::cout<<std::endl;
+	//}
 	
 	std::cout<<"Done"<<std::endl<<std::endl;
 	/***********
