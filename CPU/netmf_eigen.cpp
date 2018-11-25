@@ -31,6 +31,7 @@ using namespace std;
 
 
 int window_size = 10;
+string print_prefix = "";
 
 void print_timer(const string &message, cpu_timer &timer)
 {
@@ -43,8 +44,12 @@ void print_timer(const string &message, cpu_timer &timer)
 	float cpu = std::stof(timer.format(6, "%t"));
 
 	// std::right << std::setw(15) <<
+	// this is good for viewing
+	// std::cout << std::right << std::setw(40) << message << std::right << std::setw(15) << (wall - last_wall) << " sec wall, " << std::right << std::setw(10) << (cpu - last_cpu) <<  " sec cpu,  Acc: " << std::right << std::setw(15) << wall << "sec wall, " <<  std::right << std::setw(10) <<  cpu << "sec cpu" << endl ;
 
-	std::cout << std::right << std::setw(40) << message << std::right << std::setw(15) << (wall - last_wall) << " sec wall, " << std::right << std::setw(10) << (cpu - last_cpu) <<  " sec cpu,  Acc: " << std::right << std::setw(15) << wall << "sec wall, " <<  std::right << std::setw(10) <<  cpu << "sec cpu" << endl ;
+	// this is good for storing into csv
+	std::cout << print_prefix << ",, " << message << ",, " << (wall - last_wall) << ",, " << (cpu - last_cpu) << ",, " << wall << ",, " <<  cpu  << endl ;
+
 	last_wall = wall;
 	last_cpu = cpu;
 
@@ -149,7 +154,7 @@ MatrixXf netmf(MatrixXf &A, const string &graph_size, unsigned long long int ran
 	MatrixXf norm_adj;
 	norm_adj.noalias() = D_invsqrt * A * D_invsqrt;
 	// cout << "normalized adjacency matrix " << endl << norm_adj  << endl;
-	print_timer("normalized adjacency matrix", timer);
+	print_timer("Normalized Adjacency Matrix", timer);
 
 
 	MatrixXf M_cap;
@@ -166,7 +171,7 @@ MatrixXf netmf(MatrixXf &A, const string &graph_size, unsigned long long int ran
 		// cout << "The eigenvalues of adj_norm are:" << endl << es.eigenvalues() << endl;
 		// cout << "The matrix of eigenvectors, adj_norm, is:" << endl << es.eigenvectors() << endl << endl;
 
-		print_timer("Eigen Solved" , timer);
+		print_timer("Eigen Decomposition" , timer);
 
 		// reduction to top rank values
 		// see quick reference http://eigen.tuxfamily.org/dox/group__QuickRefPage.html#QuickRef_DiagTriSymm
@@ -216,12 +221,12 @@ MatrixXf netmf(MatrixXf &A, const string &graph_size, unsigned long long int ran
 		}
 
 		// cout << "Summed norm_adj " << endl << S << endl ;
-		print_timer("Summed norm_adj" , timer);
+		print_timer("Summed Norm_adj" , timer);
 
 
 		M_cap.noalias() = (float)( vol / ((double)(window_size * negative_sampling)) ) * (D_invsqrt * (D_invsqrt * S).transpose());
 		// cout << "approximated M is " << endl << M_cap << endl ;
-		print_timer("approximated M" , timer);
+		print_timer("Approximated M" , timer);
 		\
 	}
 	// element wise log and maximum (each element, 1)
@@ -244,7 +249,7 @@ MatrixXf netmf(MatrixXf &A, const string &graph_size, unsigned long long int ran
 
 	// cout << "Singular Values are " << endl << svd.singularValues() << endl ;
 	// cout << "Computed U  is " << endl << svd.matrixU() << endl ;
-	print_timer("SVD Computed" , timer);
+	print_timer("SVD" , timer);
 
 
 	MatrixXf U_d = svd.matrixU().leftCols(dim);
@@ -278,7 +283,7 @@ int main(int argc, char *argv[])
 		("help,h", "Help screen")
 		// requried options
 		("dataset,d"    , program_options::value<fs::path>(&dataset_name)->required() , "dataset name e.g. PPI")
-		("dataset_folder,f"        , program_options::value<fs::path>(&dataset_folder)->default_value("/home/jangid.6/work/dataset") , "path to dataset folder")
+		("dataset_folder,f"        , program_options::value<fs::path>(&dataset_folder)->default_value("/home/jangid.6/work/datasets") , "path to dataset folder")
 		// default options
 		("rank,r"              , program_options::value<unsigned long long int>(&rank)->default_value(256) , "#eigenpairs used to approximate normalized graph laplacian.")
 		("dim,d"               , program_options::value<unsigned long long int>(&dim)->default_value(128) , "dimension of embedding")
@@ -344,9 +349,13 @@ int main(int argc, char *argv[])
 		// cout << timer.format() << '\n';
 
 		unsigned long long int num_nodes = boost::num_vertices(g);
-		cout << "Dataset : " << dataset_file << endl;
-		cout << "Num_nodes : " << num_nodes << endl;
 
+		// cout << "Dataset : " << dataset_file << endl;
+		// cout << "Num_nodes : " << num_nodes << endl;
+		// cout << "Num Threads :" << Eigen::nbThreads( ) << endl; 
+
+
+		print_prefix = dataset_name.string() + ",, " + graph_size + ",, " + to_string(Eigen::nbThreads( )); 
 		print_timer("Graph Loaded from file", timer);
 
 		MatrixXf A =  MatrixXf::Zero(num_nodes, num_nodes);
@@ -382,7 +391,7 @@ int main(int argc, char *argv[])
 
 		}
 
-		print_timer("Embedding written to file", timer);
+		print_timer("Embedding Written to file", timer);
 
 
 		// // small dim 2 

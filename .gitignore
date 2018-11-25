@@ -4,6 +4,7 @@
 *.ptx
 *.cubin
 *.fatbin
+
 CPU/build
 CPU/datasets
 CPU/dist
@@ -20,4 +21,8 @@ CPU/result_set1.txt
 CPU/result.txt
 CPU/ri2_single_job_spmv_performance.sh
 CPU/todo.md
+
+CPU/6_run_set
+CPU/*.png
+CPU/slurm*
 
