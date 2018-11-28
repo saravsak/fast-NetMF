@@ -1,4 +1,4 @@
 #!/bin/bash
-rm *.o
+#rm *.o
 rm ../utils/*.o
-rm a.out
+rm netmf_small
