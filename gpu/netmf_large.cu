@@ -284,8 +284,8 @@ int main ( void ){
 	
 	cudaDeviceSynchronize();
 	
-	cudaMemcpy(W, W_device, g.size * sizeof(float), cudaMemcpyDeviceToHost);
-	cudaMemcpy(devInfoH, devInfo, sizeof(int), cudaMemcpyDeviceToHost);
+	//cudaMemcpy(W, W_device, g.size * sizeof(float), cudaMemcpyDeviceToHost);
+	//cudaMemcpy(devInfoH, devInfo, sizeof(int), cudaMemcpyDeviceToHost);
 
 	log("Filtering eigenvalues and eigen vectors");
 	filter_e<<<grid, threads>>>(W_device, e_device, g.size, window_size, rank);
@@ -293,13 +293,14 @@ int main ( void ){
 	filter_E<<<grid, threads>>>(X_device, E_device, g.size, rank);	
 	//cudaMemcpy(E_device, X_device + ptr, rank * g.size * sizeof(float), cudaMemcpyDeviceToDevice);
 
-	float *D;
-	D = (float *)malloc(g.size * g.size * sizeof(float));
+	//float *D;
+	//D = (float *)malloc(g.size * g.size * sizeof(float));
 
-	cudaMemcpy(E,E_device, rank*g.size*sizeof(float), cudaMemcpyDeviceToHost);
-	cudaMemcpy(D, D_device, g.size * g.size * sizeof(float), cudaMemcpyDeviceToHost);
-	cudaMemcpy(e,e_device, rank*sizeof(float), cudaMemcpyDeviceToHost);
-	cudaMemcpy(X,X_device, g.size * g.size*sizeof(float), cudaMemcpyDeviceToHost);
+	//cudaMemcpy(E,E_device, rank*g.size*sizeof(float), cudaMemcpyDeviceToHost);
+	//cudaMemcpy(D, D_device, g.size * g.size * sizeof(float), cudaMemcpyDeviceToHost);
+	//cudaMemcpy(e,e_device, rank*sizeof(float), cudaMemcpyDeviceToHost);
+	//cudaMemcpy(X,X_device, g.size * g.size*sizeof(float), cudaMemcpyDeviceToHost);
+	cudaDeviceSynchronize();
 
 	//std::cout<<std::endl<<std::endl<<"Value of D"<<std::endl;
 	//print_matrix(D, g.size);
@@ -319,11 +320,9 @@ int main ( void ){
 	//for(int i=0;i<rank;i++){
 	//	std::cout<<e[i]<<" ";
 	//}
-
-	cudaMemset(temp_device, 0, g.size * g.size * sizeof(float));
-	
 	log("Generating D_rt_invU");
-
+	
+	cudaMemset(temp_device, 0, g.size * g.size * sizeof(float));
 	cublasSdgmm(handle,
 		    CUBLAS_SIDE_LEFT,
 		    g.size, rank,
@@ -332,7 +331,8 @@ int main ( void ){
 		    temp_device, g.size);
 	
 	//std::cout<<"\n\nValue of D_rt_inv"<<std::endl;
-	cudaMemcpy(W, temp_device, g.size * rank * sizeof(float), cudaMemcpyDeviceToHost);	
+	//cudaMemcpy(W, temp_device, g.size * rank * sizeof(float), cudaMemcpyDeviceToHost);
+	cudaDeviceSynchronize();	
 
 	//std::cout<<std::endl<<std::endl;
 	//for(int i=0;i<rank;i++){

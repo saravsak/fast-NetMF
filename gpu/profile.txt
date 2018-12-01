@@ -1,0 +1,2 @@
+dataset,algo,dimension,window size,i/p,init,gpuio,D, X, S, M,SVD, Emb, total
+blogcatalog,large,128,10,1,481,0,0,0,0,0,0,0,482
