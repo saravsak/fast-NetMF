@@ -128,7 +128,7 @@ int main ( void ){
         log("Reading data from file");
 
         begin = Clock::now(); 
-	Graph g =  read_graph("../data/test/small_test.csv","edgelist");
+	Graph g =  read_graph("../data/blogcatalog/edges.csv","edgelist");
         end = Clock::now(); 
 
 	profile.iptime = std::chrono::duration_cast<milliseconds>(end - begin);	
@@ -164,7 +164,7 @@ int main ( void ){
 	/* Initialize and allocate variables */
 	log("Setting up host variables");
 	float *X;
-	
+	float *U, *VT, *Si;	
 	int window_size = 10;
 	profile.window_size = window_size;
 
@@ -173,6 +173,10 @@ int main ( void ){
 	int dimension = 128;
 	profile.dimension = dimension;
 	int *devInfoH;
+
+	U = (float*)malloc(size);
+	VT = (float*)malloc(size);
+	Si = (float*)malloc(g.size * sizeof(float));
 	
 	X = (float *)malloc(size);
 	devInfoH = (int *)malloc(sizeof(int));
@@ -183,13 +187,21 @@ int main ( void ){
 	float *temp_device;
 	float *X_device;
 	float *M_device;
+	
+	float *U_device, *Si_device, *VT_device;	
+
+	cudaMalloc(&U_device, size);
+	cudaMalloc(&Si_device, g.size * sizeof(float));
+	cudaMalloc(&VT_device, size);
 
 	cudaMalloc(&D_device, size);
 	cudaMalloc(&A_device, size);
 	cudaMalloc(&X_device, size);
 	cudaMalloc(&temp_device, size);
+	cudaMalloc(&M_device, size);
 
 	cudaMemset(A_device, 0, size);
+	cudaMemset(M_device, 0, size);
 	cudaMemset(D_device, 0, size);
 	cudaMemset(X_device, 0, size);
 	cudaMemset(temp_device, 0, size);
@@ -277,6 +289,7 @@ int main ( void ){
 	cudaMemcpy(W, W_device, g.size * sizeof(float), cudaMemcpyDeviceToHost);
 	cudaMemcpy(devInfoH, devInfo, sizeof(int), cudaMemcpyDeviceToHost);
 
+	// TODO: Following two operations are Async
 	log("Filtering eigenvalues and eigen vectors");
 	filter_e<<<grid, threads>>>(W_device, e_device, g.size, window_size, rank);
 	
@@ -291,27 +304,27 @@ int main ( void ){
 	cudaMemcpy(e,e_device, rank*sizeof(float), cudaMemcpyDeviceToHost);
 	cudaMemcpy(X,X_device, g.size * g.size*sizeof(float), cudaMemcpyDeviceToHost);
 
-	std::cout<<std::endl<<std::endl<<"Value of D"<<std::endl;
-	print_matrix(D, g.size);
+	//std::cout<<std::endl<<std::endl<<"Value of D"<<std::endl;
+	//print_matrix(D, g.size);
 
-	std::cout<<"Value of EV";
-	print_matrix(X, g.size);
+	//std::cout<<"Value of EV";
+	//print_matrix(X, g.size);
 
-	std::cout<<std::endl<<std::endl<<"Value of E"<<std::endl;
-	for(int i=0;i<rank;i++){
-		for(int j=0;j<g.size;j++){
-			std::cout<<E[i*g.size + j]<<" ";
-		}
-		std::cout<<std::endl;
-	}		
+//	std::cout<<std::endl<<std::endl<<"Value of E"<<std::endl;
+//	for(int i=0;i<rank;i++){
+//		for(int j=0;j<g.size;j++){
+//			std::cout<<E[i*g.size + j]<<" ";
+//		}
+//		std::cout<<std::endl;
+//	}		
 
-	std::cout<<std::endl<<std::endl<<"Value of e"<<std::endl;
-	for(int i=0;i<g.size;i++){
-		std::cout<<e[i]<<" ";
-	}
+//	std::cout<<std::endl<<std::endl<<"Value of e"<<std::endl;
+//	for(int i=0;i<g.size;i++){
+//		std::cout<<e[i]<<" ";
+//	}
 
 	cudaMemset(temp_device, 0, g.size * g.size * sizeof(float));
-
+	
 	cublasSdgmm(handle,
 		    CUBLAS_SIDE_LEFT,
 		    g.size, rank,
@@ -321,13 +334,13 @@ int main ( void ){
 
 	cudaMemcpy(W, temp_device, g.size * rank * sizeof(float), cudaMemcpyDeviceToHost);	
 
-	std::cout<<std::endl<<std::endl;
-	for(int i=0;i<g.size;i++){
-		for(int j=0; j<g.size; j++){
-			std::cout<<W[i*g.size+j]<<" ";
-		}
-		std::cout<<'\n';
-	}	
+	//std::cout<<std::endl<<std::endl;
+	//for(int i=0;i<g.size;i++){
+	//	for(int j=0; j<g.size; j++){
+	//		std::cout<<W[i*g.size+j]<<" ";
+	//	}
+	//	std::cout<<'\n';
+	//}	
 
 	cublasSdgmm(handle,
 		    CUBLAS_SIDE_LEFT,
@@ -337,14 +350,31 @@ int main ( void ){
 		    M_device, g.size);
 
 	//TODO: Perform MMT here - mmT = T.dot(m, m.T) * (vol/b)
+	log("Generating MMT");
+	float* MMT, *MMT_device;
+	MMT = (float*)malloc(size);
+	cudaMalloc(&MMT_device, sizeof(MMT)); 	
 
+	cublasSgemm(handle, 
+		    CUBLAS_OP_N, CUBLAS_OP_T, 
+		    g.size, g.size, g.size,
+		    &al,
+	            M_device,g.size, 
+		    M_device, g.size,
+		    &bet, 
+		    MMT_device, g.size);
+	
+	const float scale = float(g.volume)/float(b);
 	cublasSscal(handle, g.size * g.size,
-			float(vol)/float(b)
-			M_device, 
+			&scale,
+			MMT_device, 
 			1);
 
-	transform_m(M_device, g.size);
+	transform_m<<<grid, threads>>>(MMT_device, g.size);
+	signed char jobu = 'A';
+	signed char jobvt = 'N';
 	
+	log("Performing SVD");
 	cusolverDnSgesvd(cusolverH, jobu, jobvt, 
 			g.size, g.size, M_device, g.size, 
 			Si_device, 
@@ -355,6 +385,7 @@ int main ( void ){
 			d_rwork, 
 			devInfo); 
 		
+	log("Changing Si");
 	sqrt_si<<<grid, threads>>>(Si_device, dimension);	
 	cublasSdgmm(handle, 
 	    CUBLAS_SIDE_LEFT, 
@@ -365,7 +396,6 @@ int main ( void ){
 		
         cudaDeviceSynchronize();
 	cudaMemcpy(W, W_device, size, cudaMemcpyDeviceToHost);
-
 
 	write_embeddings("blogcatalog.emb",W, g.size, dimension);	
 	write_profile("profile.txt", profile);		

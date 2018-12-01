@@ -80,13 +80,13 @@ Graph read_graph(std::string filename, std::string format){
 
 Graph read_graph_from_metis(std::string filename){
 	/* TODO: Placeholder functions */
-	Graph G(4);
+	Graph G(4,10);
 	return G;
 }
 
 Graph read_graph_from_mat(std::string filename){
 	/* TODO: Placeholder functions */
-	Graph G(4);
+	Graph G(4,10);
 	return G;
 }
 
@@ -104,6 +104,8 @@ Graph read_graph_from_edgelist(std::string filename){
 	int node_num = 0, source=0, target=0;
 	std::vector<std::string> nodes;
 	std::string temp;
+
+	int num_edges = 0;
 	
 	while(inFile>>line){
 		
@@ -138,12 +140,12 @@ Graph read_graph_from_edgelist(std::string filename){
 		}
 		
 		adj_list.find(source)->second.push_back(target);
-		adj_list.find(target)->second.push_back(source);		
-
+		adj_list.find(target)->second.push_back(source);
+		num_edges+=2;
 	}
 
 	std::map<int, std::vector<int>>::iterator it;
-        Graph G(node_mapping.size());	
+        Graph G(node_mapping.size(), num_edges);	
 	
 	for(it = adj_list.begin(); it != adj_list.end(); it++){
 		source = it->first;

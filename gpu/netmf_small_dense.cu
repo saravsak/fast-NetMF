@@ -1,25 +1,21 @@
 /* 
 TODO: 
 1. Change thread architecture
-2. USe cuBlas for addition
+2. Use cuBlas for addition
+3. Async copy to device
 */
 
-/* 
-Question for prof
-1. Copy stuff within GPU
-2. Launch kernel without copy
-3. Is it better to do more redundant work in one thread or one more kernle to do it once?
-4. Results are wrong if I use same variable as result. Why?
-*/
 #include<stdlib.h>
 #include<iostream>
+#include<time.h>
+#include<chrono>
 
 #include<cuda_runtime.h>
 #include<cublas_v2.h>
 #include<cusolverDn.h>
 
 #include "../utils/graph.h"
-#include "../utils/graphio.h"
+#include "../utils/io.h"
 
 __global__ void compute_d(float* deg, int size){
 	int id = blockIdx.x * blockDim.x + threadIdx.x;
@@ -28,7 +24,10 @@ __global__ void compute_d(float* deg, int size){
 
 	id = id * size + id;
 	
-	// Make assumption here that graph is connected and every node has degree atleast 1.
+	/* Make assumption here that graph is  	*/
+	/* connected and every node has degree 	*/
+        /* atleast 1. 		       		*/
+
 	deg[id] = sqrt(1/deg[id]); 
 }
 
@@ -77,27 +76,45 @@ void print_matrix(float* S, int size){
 
 
 int main ( void ){
-
 	/**************
  	* NetMF small *
 	**************/
-	
+
+	/* General housekeeping */
+	typedef std::chrono::high_resolution_clock Clock;
+	typedef std::chrono::milliseconds milliseconds;
+        Clock::time_point begin, end;
+	info profile; 
+	profile.dataset = "PPI";
+	profile.algo = "small";
+
 	/* Load graph */
-        std::cout<<"Reading data from file"<<std::endl;
-	Graph g =  read_graph("../data/blogcatalog/edges.csv","edgelist");
+        log("Reading data from file");
 
-        std::cout<<"Initializing"<<std::endl;
+        begin = Clock::now(); 
+	Graph g =  read_graph("../data/ppi/ppi.edgelist","edgelist");
+        end = Clock::now(); 
+
+	profile.iptime = std::chrono::duration_cast<milliseconds>(end - begin);	
+
 	/* CUDA housekeeping */
-	dim3 threads(128);
-	dim3 grid((int)ceil((float)g.size/128));
+	log("Running Initialization routine");
+	log("Defining Threads");
 
-	/* cuBlas housekeeping */	
+	begin = Clock::now();
+	float num_threads = 128;	
+	dim3 threads(num_threads);
+	dim3 grid((int)ceil((float)g.size/num_threads));
+
+	/* cuBlas housekeeping */
+	log("Creating cuBlas variables");
 	cublasHandle_t handle;
 	cublasCreate(&handle);
 	float al=1.0f;
 	float bet=1.0f;
 
-	/* cuSolver housekeepinh */
+	/* cuSolver housekeeping */
+	log("Setting up cuSolver");	
 	int lwork = 0;
 	signed char jobu = 'A';
 	signed char jobvt = 'N';
@@ -112,17 +129,19 @@ int main ( void ){
 	cudaMalloc(&d_rwork, sizeof(float) *( g.size - 1));
 
 	/* Initialize and allocate variables */
-	// HOST
+	log("Setting up host variables");
 	float *U, *VT, *Si, *W;
 	float *X;
 	float *S;
 	float *M;
 	
 	int window_size = 10;
+	profile.window_size = window_size;
 	int size = g.size * g.size * sizeof(float);
 	int b = 1;
 	int dimension = 128;
-	int *devInfoH;
+	profile.dimension = dimension;
+	//int *devInfoH;
 	
 	X = (float *)malloc(size);
 	S = (float *)malloc(size);
@@ -131,9 +150,9 @@ int main ( void ){
 	VT = (float*)malloc(size);
 	W = (float*)malloc(size);
 	Si = (float*)malloc(g.size * sizeof(float));
-	devInfoH = (int *)malloc(sizeof(int));
+	//devInfoH = (int *)malloc(sizeof(int));
 
-	// DEVICE
+	log("Setting up device variables");
 	float *D_device;
 	float *temp_device;
 	float *temp1_device;
@@ -167,19 +186,33 @@ int main ( void ){
 	cudaMemset(M_temp_device, 0, size);
 	cudaMemset(temp_device, 0, size);
 	cudaMemset(temp1_device, 0, size);
-
+	end = Clock::now();
+	profile.init = std::chrono::duration_cast<milliseconds>(end - begin);
+	
 	/* Copy necessary variables to device */
-	std::cout<<"Moving data to device"<<std::endl;
+	/* 
+	   Note: Make this a non-blocking operation using
+	   using Async since g.degree, g.adj and g.size 
+	   are available at the very beginning
+	*/
+	log("Moving data to device");
+	begin = Clock::now();
 	cudaMemcpy(D_device, g.degree, size, cudaMemcpyHostToDevice);	
 	cudaMemcpy(A_device, g.adj, size , cudaMemcpyHostToDevice);	
+	end = Clock::now();
+	profile.gpuio = std::chrono::duration_cast<milliseconds>(end - begin);;
 
 	/* Compute D = D^{-1/2} */
-	std::cout<<"Computing normalized D"<<std::endl;
+	begin = Clock::now();
+	log("Computing normalized D");
 	compute_d<<<grid, threads>>>(D_device, g.size);
 	cudaDeviceSynchronize();
+	end = Clock::now();
+	profile.compute_d = std::chrono::duration_cast<milliseconds>(end - begin);;
 
 	/* Compute X = D^{-1/2}AD^{-1/2} */
-	std::cout<<"Computing X"<<std::endl;
+	log("Computing X");
+	begin = Clock::now();
 	cublasSgemm(handle, 
 		    CUBLAS_OP_N, CUBLAS_OP_N, 
 		    g.size, g.size, g.size,
@@ -198,16 +231,14 @@ int main ( void ){
 		    &bet, 
 		    X_device, g.size);
 	cudaDeviceSynchronize();	
-	
+	end = Clock::now();
+	profile.compute_x = std::chrono::duration_cast<milliseconds>(end - begin);;	
 	/* Compute S = sum(X^{0}....X^{window_size}) */
 	
-	// This might be too slow. Experiment to see if you can use a custom kernel 
-	//cudaMemcpy(X, X_device, size, cudaMemcpyDeviceToHost);
-	//print_matrix(X, g.size);
-
 	cudaMemcpy(S_device, X_device, size, cudaMemcpyDeviceToDevice);
 	cudaMemcpy(temp_device, X_device, size, cudaMemcpyDeviceToDevice);
 
+	begin = Clock::now();
 	for(int i=2;i<=window_size;i++){
 		std::cout<<"Computing X^"<<i<<std::endl;
 		cublasSgemm(handle, 
@@ -218,26 +249,26 @@ int main ( void ){
 	            temp_device,g.size, 
 		    &bet, 
 		    temp1_device, g.size);
+		cudaDeviceSynchronize();		
 		
 		// Use cublas addition functions
 		compute_s<<<grid, threads>>>(S_device, temp1_device, g.size);
-		//cudaMemcpy(temp_device, temp1_device, size, cudaMemcpyDeviceToDevice);
 		cudaDeviceSynchronize();
+		
 		cudaMemset(temp1_device,0,size);
 	}
 
 	// Compute S = S * (vol / (window_size * b))
-	std::cout<<"Transforming S"<<std::endl;
 	transform_s<<<grid,threads>>>(S_device,g.volume, window_size, b, g.size);
-	//cudaMemcpy(S, S_device, size, cudaMemcpyDeviceToHost);
         cudaDeviceSynchronize();
-
-        //print_matrix(S, g.size);
+	end = Clock::now();
+	profile.compute_s = std::chrono::duration_cast<milliseconds>(end - begin);;
 	
 	// Compute M = D^{-1/2} * S * D^{-1/2}
 	cudaMemset(temp_device, 0, size); 
-
-	std::cout<<"Computing M"<<std::endl;
+	
+	begin = Clock::now();
+	log("Computing M");
 	cublasSgemm(handle, 
 	    CUBLAS_OP_N, CUBLAS_OP_N, 
 	    g.size, g.size, g.size,
@@ -257,16 +288,18 @@ int main ( void ){
 	    &bet, 
 	    M_device, g.size);
         cudaDeviceSynchronize();
-		
+	
 	// Compute M = log(max(Mi,1))
-	std::cout<<"Transforming M"<<std::endl;
+	log("Transforming M");
 	transform_m<<<grid,threads>>>(M_device, g.size);
         cudaDeviceSynchronize();
-
-	// Do need to transpose M, since M is symmetric matrix
+	
+	end = Clock::now();
+	profile.compute_m = std::chrono::duration_cast<milliseconds>(end - begin);;
 	
 	// Perform SVD on M
-	std::cout<<"SVD"<<std::endl;
+	begin = Clock::now();
+	log("Performing SVD of M");
 	cusolverDnSgesvd(cusolverH, jobu, jobvt, 
 			g.size, g.size, M_device, g.size, 
 			Si_device, 
@@ -277,29 +310,16 @@ int main ( void ){
 			d_rwork, 
 			devInfo); 
 	
-	//cudaMemcpy(U, U_device, size, cudaMemcpyDeviceToHost);
-	//print_matrix(U, g.size);	
-	//cudaMemcpy(VT, VT_device, size, cudaMemcpyDeviceToHost);
-	//print_matrix(VT, g.size);	
         cudaDeviceSynchronize();
+	end = Clock::now();
+	profile.svd = std::chrono::duration_cast<milliseconds>(end - begin);;	
 	
-	//cudaMemcpy(Si, Si_device, sizeof(float) * g.size, cudaMemcpyDeviceToHost);
-	//std::cout<<std::endl<<std::endl;
-	//for(int i=0;i<g.size;i++){
-	//	std::cout<<Si[i]<<" ";
-	//}
-
-	//cudaMemcpy(devInfoH, devInfo, sizeof(int), cudaMemcpyDeviceToHost);
-
-	//std::cout<<"\nDev Info:"<<*devInfoH<<std::endl;
-
-	//std::cout<<std::endl<<std::endl;
-	
-	std::cout<<"Transforming Si"<<std::endl;
+	begin = Clock::now();
+	log("Transforming Si");
 	sqrt_si<<<grid, threads>>>(Si_device, dimension);	
         cudaDeviceSynchronize();
 
-	std::cout<<"Computing W"<<std::endl;
+	log("Generating embeddings");
 	cublasSdgmm(handle, 
 	    CUBLAS_SIDE_LEFT, 
 	    g.size, dimension,
@@ -307,18 +327,14 @@ int main ( void ){
 	    Si_device,1, 
 	    W_device, g.size);
         cudaDeviceSynchronize();
+	end = Clock::now();
+	profile.emb = std::chrono::duration_cast<milliseconds>(end - begin);;
 
 	cudaMemcpy(W, W_device, size, cudaMemcpyDeviceToHost);
-	
-	std::cout<<std::endl<<std::endl;
-	//for(int i=0;i<dimension;i++){
-	//	for(int j=0;j<g.size;j++){
-	//		std::cout<<W[i*g.size + j]<<" ";
-	//	}
-	//	std::cout<<std::endl;
-	//}
-	
-	std::cout<<"Done"<<std::endl<<std::endl;
+
+	write_embeddings("ppi.emb",W, g.size, dimension);	
+	write_profile("profile.txt", profile);		
+	log("Done");
 	/***********
 	* Clean up *
 	***********/
