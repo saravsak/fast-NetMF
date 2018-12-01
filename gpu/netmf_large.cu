@@ -83,6 +83,7 @@ __global__ void filter_e(float *W, float *e, int size, int window_size, int rank
 	      val = (el * (1 - powf(el, window_size))) / ((1-el) * window_size);
 	      e[id] = 0 > val ? 0: val;
 	}
+	e[id] = sqrt(e[id]);
 
 }
 
@@ -156,6 +157,8 @@ int main ( void ){
 	cublasFillMode_t uplo = CUBLAS_FILL_MODE_LOWER;
 	float *d_work, *d_rwork;
 	int *devInfo;
+	signed char jobu = 'A';
+	signed char jobvt = 'N';
 	
 	cudaMalloc(&devInfo, sizeof(int));
 	cusolverDnHandle_t cusolverH;
@@ -164,6 +167,12 @@ int main ( void ){
 	/* Initialize and allocate variables */
 	log("Setting up host variables");
 	float *X;
+	float *V;
+	float *W;
+	float *e;
+	float *E;
+	int rank = 256;
+	float *Embedding;
 	
 	int window_size = 10;
 	profile.window_size = window_size;
@@ -176,6 +185,11 @@ int main ( void ){
 	
 	X = (float *)malloc(size);
 	devInfoH = (int *)malloc(sizeof(int));
+	V = (float *) malloc(size);
+	W = (float *) malloc(size);
+	e = (float *) malloc(rank * sizeof(float));
+	E = (float *) malloc(rank * g.size * sizeof(float));
+	Embedding = (float *)malloc(g.size * dimension *sizeof(float));
 
 	log("Setting up device variables");
 	float *D_device;
@@ -183,16 +197,32 @@ int main ( void ){
 	float *temp_device;
 	float *X_device;
 	float *M_device;
+	float *U_device, *VT_device, *Si_device;
+	float *W_device;
+	float *e_device;
+	float *E_device;
+	float *Embedding_device;
+
+	cudaMalloc((void **)&W_device, sizeof(float) * g.size);
+	cudaMalloc((void **)&e_device, sizeof(float) * rank);
+	cudaMalloc((void **)&E_device, sizeof(float) * g.size * rank);
+	cudaMalloc((void **)&Embedding_device, sizeof(float) * g.size * dimension);
 
 	cudaMalloc(&D_device, size);
 	cudaMalloc(&A_device, size);
 	cudaMalloc(&X_device, size);
 	cudaMalloc(&temp_device, size);
+	cudaMalloc(&M_device, size);
+	cudaMalloc(&U_device, size);
+	cudaMalloc(&Si_device, g.size * sizeof(float));
+	cudaMalloc(&VT_device, size);
+	cudaMalloc(&d_work, sizeof(float) * lwork);
 
 	cudaMemset(A_device, 0, size);
 	cudaMemset(D_device, 0, size);
 	cudaMemset(X_device, 0, size);
 	cudaMemset(temp_device, 0, size);
+	cudaMemset(M_device, 0, size);
 
 	end = Clock::now();
 	profile.init = std::chrono::duration_cast<milliseconds>(end - begin);
@@ -244,27 +274,7 @@ int main ( void ){
 
 	/* Eigen decomposition of X */
 	log("Eigen Decomposition of X");
-	float *V;
-	float *W;
-	float *e;
-	float *E;
-	int rank = 2;
-	
-	V = (float *) malloc(size);
-	W = (float *) malloc(size);
-	e = (float *) malloc(rank * sizeof(float));
-	E = (float *) malloc(rank * g.size * sizeof(float));
-
-	float *W_device;
-	float *e_device;
-	float *E_device;
-
-	cudaMalloc((void **)&W_device, sizeof(float) * g.size);
-	cudaMalloc((void **)&e_device, sizeof(float) * rank);
-	cudaMalloc((void **)&E_device, sizeof(float) * g.size * rank);
-
 	cusolverDnSsyevd_bufferSize(cusolverH,jobz, uplo, g.size, X_device, g.size, W_device, &lwork);
-	cudaMalloc(&d_work, sizeof(float) * lwork);
 
 	cusolverDnSsyevd(cusolverH, 
 			jobz, uplo, g.size, 
@@ -291,26 +301,28 @@ int main ( void ){
 	cudaMemcpy(e,e_device, rank*sizeof(float), cudaMemcpyDeviceToHost);
 	cudaMemcpy(X,X_device, g.size * g.size*sizeof(float), cudaMemcpyDeviceToHost);
 
-	std::cout<<std::endl<<std::endl<<"Value of D"<<std::endl;
-	print_matrix(D, g.size);
+	//std::cout<<std::endl<<std::endl<<"Value of D"<<std::endl;
+	//print_matrix(D, g.size);
 
-	std::cout<<"Value of EV";
-	print_matrix(X, g.size);
+	//std::cout<<"Value of EV";
+	//print_matrix(X, g.size);
 
-	std::cout<<std::endl<<std::endl<<"Value of E"<<std::endl;
-	for(int i=0;i<rank;i++){
-		for(int j=0;j<g.size;j++){
-			std::cout<<E[i*g.size + j]<<" ";
-		}
-		std::cout<<std::endl;
-	}		
+	//std::cout<<std::endl<<std::endl<<"Value of E"<<std::endl;
+	//for(int i=0;i<rank;i++){
+	//	for(int j=0;j<g.size;j++){
+	//		std::cout<<E[i*g.size + j]<<" ";
+	//	}
+	//	std::cout<<std::endl;
+	//}		
 
-	std::cout<<std::endl<<std::endl<<"Value of e"<<std::endl;
-	for(int i=0;i<g.size;i++){
-		std::cout<<e[i]<<" ";
-	}
+	//std::cout<<std::endl<<std::endl<<"Value of e"<<std::endl;
+	//for(int i=0;i<rank;i++){
+	//	std::cout<<e[i]<<" ";
+	//}
 
 	cudaMemset(temp_device, 0, g.size * g.size * sizeof(float));
+	
+	log("Generating D_rt_invU");
 
 	cublasSdgmm(handle,
 		    CUBLAS_SIDE_LEFT,
@@ -318,35 +330,67 @@ int main ( void ){
 		    E_device, g.size,
 		    D_device, g.size + 1,
 		    temp_device, g.size);
-
+	
+	//std::cout<<"\n\nValue of D_rt_inv"<<std::endl;
 	cudaMemcpy(W, temp_device, g.size * rank * sizeof(float), cudaMemcpyDeviceToHost);	
 
-	std::cout<<std::endl<<std::endl;
-	for(int i=0;i<g.size;i++){
-		for(int j=0; j<g.size; j++){
-			std::cout<<W[i*g.size+j]<<" ";
-		}
-		std::cout<<'\n';
-	}	
+	//std::cout<<std::endl<<std::endl;
+	//for(int i=0;i<rank;i++){
+	//	for(int j=0; j<g.size; j++){
+	//		std::cout<<W[i*g.size+j]<<" ";
+	//	}
+	//	std::cout<<'\n';
+	//}	
+
+	log("Computing M");
+	float *M;
+	M = (float*) malloc(size);
 
 	cublasSdgmm(handle,
-		    CUBLAS_SIDE_LEFT,
+		    CUBLAS_SIDE_RIGHT,
 		    g.size, rank,
 		    temp_device, g.size,
 		    e_device, 1,
 		    M_device, g.size);
 
-	//TODO: Perform MMT here - mmT = T.dot(m, m.T) * (vol/b)
+	cudaMemcpy(M, M_device, size, cudaMemcpyDeviceToHost);
 
+	//std::cout<<"\nValue of M"<<std::endl;
+	//print_matrix(M, g.size);
+
+	//TODO: Perform MMT here - mmT = T.dot(m, m.T) * (vol/b)
+	log("Computing MMT");
+	float *MMT_device, *MMT;
+	cudaMalloc(&MMT_device, size);
+	MMT = (float*) malloc(size);
+
+	cublasSgemm(handle, 
+		    CUBLAS_OP_N, CUBLAS_OP_T, 
+		    g.size, g.size, g.size,
+		    &al,
+	            M_device,g.size, 
+		    M_device, g.size,
+		    &bet, 
+		    MMT_device, g.size);
+	
+	const float scale = float(g.volume)/float(b);
+
+	log("Scaling MMT");
 	cublasSscal(handle, g.size * g.size,
-			float(vol)/float(b)
-			M_device, 
+			&scale,
+			MMT_device, 
 			1);
 
-	transform_m(M_device, g.size);
+	log("Filtering MMT");
+	transform_m<<<grid, threads>>>(MMT_device, g.size);
+
+	cudaMemcpy(MMT, MMT_device, size, cudaMemcpyDeviceToHost);
+	//std::cout<<"\n Value of MMT";
+	//print_matrix(MMT, g.size);
 	
+	log("Performing SVD");	
 	cusolverDnSgesvd(cusolverH, jobu, jobvt, 
-			g.size, g.size, M_device, g.size, 
+			g.size, g.size, MMT_device, g.size, 
 			Si_device, 
 			U_device, g.size, 
 			VT_device, g.size, 
@@ -354,20 +398,52 @@ int main ( void ){
 			lwork, 
 			d_rwork, 
 			devInfo); 
-		
+	
+	log("Computing Sqrt of Si");
 	sqrt_si<<<grid, threads>>>(Si_device, dimension);	
+	
+	float *U, *Si;
+	U = (float *)malloc(size);
+	Si = (float *)malloc(g.size * sizeof(float));
+
+	cudaMemcpy(U, U_device, size, cudaMemcpyDeviceToHost);
+	cudaMemcpy(Si, Si_device, g.size * sizeof(float), cudaMemcpyDeviceToHost);
+
+	//std::cout<<"\n\nPrinting singular matrix U"<<std::endl;	
+	//print_matrix(U, g.size);
+
+	//std::cout<<"\nPrinting Singular vector"<<std::endl;	
+	//for(int i=0;i<g.size;i++){
+	//	std::cout<<Si[i]<<" ";	
+	//}	
+	//std::cout<<std::endl;	
+	
+	
+	
+        //cudaDeviceSynchronize();
+	// POSSIBLE ERROR: CHECK INCREMENT OPERATOR
+	log("Generating embeddings");
 	cublasSdgmm(handle, 
-	    CUBLAS_SIDE_LEFT, 
+	    CUBLAS_SIDE_RIGHT, 
 	    g.size, dimension,
 	    U_device, g.size,
-	    Si_device,1, 
-	    W_device, g.size);
+	    Si_device,-1, 
+	    Embedding_device, g.size);
 		
-        cudaDeviceSynchronize();
-	cudaMemcpy(W, W_device, size, cudaMemcpyDeviceToHost);
+        //cudaDeviceSynchronize();
+	log("Writing embeddings to file");
+	cudaMemcpy(Embedding, Embedding_device, dimension * g.size * sizeof(float), cudaMemcpyDeviceToHost);
+	
+	//print_matrix(W, g.size);
+//	for(int i=0;i<g.size;i++){
+//		std::cout<<"\n";
+//		for(int j=0;j<dimension;j++){
+//			std::cout<<Embedding[j*g.size+i]<<" ";
+//		}
+//	}
 
 
-	write_embeddings("blogcatalog.emb",W, g.size, dimension);	
+	write_embeddings("blogcatalog.emb",Embedding, g.size, dimension);	
 	write_profile("profile.txt", profile);		
 	log("Done");
 	/***********
