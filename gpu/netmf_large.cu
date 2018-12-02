@@ -157,6 +157,8 @@ int main ( void ){
 	cublasFillMode_t uplo = CUBLAS_FILL_MODE_LOWER;
 	float *d_work, *d_rwork;
 	int *devInfo;
+	signed char jobu = 'A';
+	signed char jobvt = 'N';
 	
 	cudaMalloc(&devInfo, sizeof(int));
 	cusolverDnHandle_t cusolverH;
@@ -165,17 +167,27 @@ int main ( void ){
 	/* Initialize and allocate variables */
 	log("Setting up host variables");
 	float *X;
+	float *MMT;
+	float *Embedding;
 	
 	int window_size = 10;
 	profile.window_size = window_size;
 
 	int size = g.size * g.size * sizeof(float);
 	int b = 1;
+	int rank = 2;
 	int dimension = 2;
+	const float scale = float(g.volume)/float(b);
 	profile.dimension = dimension;
 	
 	X = (float *)malloc(size);
-
+	MMT = (float *) malloc(size);
+	Embedding = (float *)malloc(g.size * dimension * sizeof(float));
+	
+	memset(MMT, 0, size);
+	memset(X, 0, size);
+	memset(Embedding, 0, g.size * dimension *sizeof(float));
+	
 	log("Setting up device variables");
 	float *D_device;
 	float *A_device;
@@ -183,12 +195,17 @@ int main ( void ){
 	float *X_device;
 	float *M_device;
 	float *U_device, *VT_device, *Si_device;
-	int rank = 2;
 
 	float *W_device;
 	float *e_device;
 	float *E_device;
+	float *MMT_device;
+	
+	float *Embedding_device;
 
+	cudaMalloc(&Embedding_device, g.size * dimension *sizeof(float));
+
+	cudaMalloc(&MMT_device, size);
 	cudaMalloc((void **)&W_device, sizeof(float) * g.size);
 	cudaMalloc((void **)&e_device, sizeof(float) * rank);
 	cudaMalloc((void **)&E_device, sizeof(float) * g.size * rank);
@@ -202,6 +219,7 @@ int main ( void ){
 	cudaMalloc(&temp_device, size);
 	cudaMalloc(&M_device, size);
 
+	cudaMemset(MMT_device, 0, size);
 	cudaMemset(A_device, 0, size);
 	cudaMemset(D_device, 0, size);
 	cudaMemset(X_device, 0, size);
@@ -291,13 +309,6 @@ int main ( void ){
 		    e_device, 1,
 		    M_device, g.size);
 
-	float *M = (float *)malloc( g.size * rank * sizeof(float));
-	
-	float *MMT, *MMT_device;
-	cudaMalloc(&MMT_device, size);
-	cudaMemset(MMT_device, 0, size);
-	MMT = (float *) malloc(size);
-	memset(MMT, 0, size);
 	cublasSgemm(handle, 
 		    CUBLAS_OP_N, CUBLAS_OP_T, 
 		    g.size, g.size, g.size,
@@ -307,21 +318,12 @@ int main ( void ){
 		    &bet, 
 		    MMT_device, g.size);
 
-	const float scale = float(g.volume)/float(b);
 	cudaDeviceSynchronize();	
 	cublasSscal(handle, g.size * g.size,
 			&scale,
 			MMT_device, 
 			1);
 
-	
-	signed char jobu = 'A';
-	signed char jobvt = 'N';
-	
-	float *Embedding, *Embedding_device;
-
-	cudaMalloc(&Embedding_device, g.size * dimension *sizeof(float));
-	Embedding = (float *)malloc(g.size * dimension * sizeof(float));
 	
 	transform_m<<<grid,threads>>>(MMT_device, g.size);
 	
