@@ -5,39 +5,6 @@
 
 typedef std::chrono::milliseconds milliseconds;
 
-struct CSR
-{
-	unsigned int* row_indx{};
-        unsigned int* col_id{}; 	
-	float* values{};
-
-	unsigned int nrows{};
-	unsigned int ncols{};
-	unsigned int nnz{};
-};
-
-struct CSC
-{
-        unsigned int* col_indx{}; 	
-	unsigned int* row_id{};
-	float* values{};
-
-	unsigned int nrows{};
-	unsigned int ncols{};
-	unsigned int nnz{};
-};
-
-struct COO
-{
-	unsigned int* row_id{};
-        unsigned int* col_id{}; 	
-	float* values{};
-
-	unsigned int nrows{};
-	unsigned int ncols{};
-	unsigned int nnz{};
-};
-
 struct info {
 	const char * dataset;
 	const char * algo;

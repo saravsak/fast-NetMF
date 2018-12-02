@@ -129,7 +129,7 @@ int main ( void ){
         log("Reading data from file");
 
         begin = Clock::now(); 
-	Graph g =  read_graph("../data/blogcatalog/edges.csv","edgelist");
+	Graph g =  read_graph("../data/test/small_test.csv","edgelist");
         end = Clock::now(); 
 
 	profile.iptime = std::chrono::duration_cast<milliseconds>(end - begin);	
