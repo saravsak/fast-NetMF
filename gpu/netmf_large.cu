@@ -288,12 +288,6 @@ int main ( void ){
 	float *D;
 	D = (float *)malloc(g.size * g.size * sizeof(float));
 
-	cudaMemcpy(E,E_device, rank*g.size*sizeof(float), cudaMemcpyDeviceToHost);
-	cudaMemcpy(D, D_device, g.size * g.size * sizeof(float), cudaMemcpyDeviceToHost);
-	cudaMemcpy(e,e_device, rank*sizeof(float), cudaMemcpyDeviceToHost);
-	cudaMemcpy(X,X_device, g.size * g.size*sizeof(float), cudaMemcpyDeviceToHost);
-
-
 	cudaMemset(temp_device, 0, g.size * g.size * sizeof(float));
 
 	cublasSdgmm(handle,
@@ -303,7 +297,6 @@ int main ( void ){
 		    D_device, g.size + 1,
 		    temp_device, g.size);
 
-	cudaMemcpy(W, temp_device, g.size * rank * sizeof(float), cudaMemcpyDeviceToHost);	
 
 	cublasSdgmm(handle,
 		    CUBLAS_SIDE_RIGHT,
@@ -314,8 +307,6 @@ int main ( void ){
 
 	float *M = (float *)malloc( g.size * rank * sizeof(float));
 	
-	cudaMemcpy(M, M_device, g.size * rank * sizeof(float), cudaMemcpyDeviceToHost);
-
 	float *MMT, *MMT_device;
 	cudaMalloc(&MMT_device, size);
 	cudaMemset(MMT_device, 0, size);
@@ -337,7 +328,6 @@ int main ( void ){
 			MMT_device, 
 			1);
 
-	cudaMemcpy(MMT, MMT_device, size, cudaMemcpyDeviceToHost);
 	
 	signed char jobu = 'A';
 	signed char jobvt = 'N';
@@ -348,7 +338,6 @@ int main ( void ){
 	Embedding = (float *)malloc(g.size * dimension * sizeof(float));
 	
 	transform_m<<<grid,threads>>>(MMT_device, g.size);
-	cudaMemcpy(MMT, MMT_device, size, cudaMemcpyDeviceToHost);
 
 	float *U, *Si;
 	U = (float *)malloc(g.size * g.size * sizeof(float));
@@ -365,8 +354,6 @@ int main ( void ){
 			d_rwork, 
 			devInfo); 
 	
-	cudaMemcpy(U, U_device, g.size * g.size *sizeof(float), cudaMemcpyDeviceToHost);
-	cudaMemcpy(Si, Si_device, g.size *sizeof(float), cudaMemcpyDeviceToHost);
 
 	sqrt_si<<<grid, threads>>>(Si_device, dimension);
 	cublasSdgmm(handle, 
