@@ -385,7 +385,10 @@ int main ( void ){
 	cudaMalloc(&Embedding_device, g.size * dimension *sizeof(float));
 	Embedding = (float *)malloc(g.size * dimension * sizeof(float));
 	
-	transform_m<<<grid,threads>>>(M_device, g.size);
+	transform_m<<<grid,threads>>>(MMT_device, g.size);
+	cudaMemcpy(MMT, MMT_device, size, cudaMemcpyDeviceToHost);
+	std::cout<<"Value of MMT";
+	print_matrix(MMT, g.size);
 	
 	cusolverDnSgesvd(cusolverH, jobu, jobvt, 
 			g.size, g.size, MMT_device, g.size, 
