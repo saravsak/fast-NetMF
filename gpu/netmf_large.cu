@@ -173,10 +173,8 @@ int main ( void ){
 	int b = 1;
 	int dimension = 2;
 	profile.dimension = dimension;
-	int *devInfoH;
 	
 	X = (float *)malloc(size);
-	devInfoH = (int *)malloc(sizeof(int));
 
 	log("Setting up device variables");
 	float *D_device;
@@ -250,16 +248,7 @@ int main ( void ){
 
 	/* Eigen decomposition of X */
 	log("Eigen Decomposition of X");
-	float *V;
-	float *W;
-	float *e;
-	float *E;
 	int rank = 2;
-	
-	V = (float *) malloc(size);
-	W = (float *) malloc(size);
-	e = (float *) malloc(rank * sizeof(float));
-	E = (float *) malloc(rank * g.size * sizeof(float));
 
 	float *W_device;
 	float *e_device;
@@ -284,9 +273,6 @@ int main ( void ){
 	filter_e<<<grid, threads>>>(W_device, e_device, g.size, window_size, rank);
 	
 	filter_E<<<grid, threads>>>(X_device, E_device, g.size, rank);	
-
-	float *D;
-	D = (float *)malloc(g.size * g.size * sizeof(float));
 
 	cudaMemset(temp_device, 0, g.size * g.size * sizeof(float));
 
@@ -338,11 +324,6 @@ int main ( void ){
 	Embedding = (float *)malloc(g.size * dimension * sizeof(float));
 	
 	transform_m<<<grid,threads>>>(MMT_device, g.size);
-
-	float *U, *Si;
-	U = (float *)malloc(g.size * g.size * sizeof(float));
-	Si = (float *)malloc(g.size * sizeof(float));
-
 	
 	cusolverDnSgesvd(cusolverH, jobu, jobvt, 
 			g.size, g.size, MMT_device, g.size, 
