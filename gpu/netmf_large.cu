@@ -268,6 +268,7 @@ int main ( void ){
 	cusolverDnSsyevd_bufferSize(cusolverH,jobz, uplo, g.size, X_device, g.size, W_device, &lwork);
 	cudaMalloc(&d_work, sizeof(float) * lwork);
 
+	begin = Clock::now();
 	cusolverDnSsyevd(cusolverH, 
 			jobz, uplo, g.size, 
 			X_device, g.size, 
@@ -275,7 +276,10 @@ int main ( void ){
 			lwork, devInfo);
 	
 	cudaDeviceSynchronize();
-	
+	end = Clock::now();
+	profile.compute_s = std::chrono::duration_cast<milliseconds>(end - begin);;	
+
+	begin = Clock::now();
 	log("Filtering eigenvalues and eigen vectors");
 	filter_e<<<grid, threads>>>(W_device, e_device, g.size, window_size, rank);
 	cudaDeviceSynchronize();	
@@ -319,7 +323,10 @@ int main ( void ){
 	
 	transform_m<<<grid,threads>>>(MMT_device, g.size);
 	cudaDeviceSynchronize();	
-	
+	end = Clock::now();
+	profile.compute_m = std::chrono::duration_cast<milliseconds>(end - begin);	
+
+	begin = Clock::now();	
 	cusolverDnSgesvd(cusolverH, jobu, jobvt, 
 			g.size, g.size, MMT_device, g.size, 
 			Si_device, 
@@ -330,8 +337,10 @@ int main ( void ){
 			d_rwork, 
 			devInfo); 
 	cudaDeviceSynchronize();	
-	
+	end = Clock::now();
+	profile.svd = std::chrono::duration_cast<milliseconds>(end - begin);	
 
+	begin = Clock::now();
 	sqrt_si<<<grid, threads>>>(Si_device, dimension);
 	cudaDeviceSynchronize();	
 	cublasSdgmm(handle, 
@@ -345,7 +354,8 @@ int main ( void ){
 	
 
 	cudaMemcpy(Embedding, Embedding_device,sizeof(float)* g.size * dimension, cudaMemcpyDeviceToHost);
-
+	end = Clock::now();
+	profile.emb = std::chrono::duration_cast<milliseconds>(end - begin);	
 
 	write_embeddings("blogcatalog.emb",Embedding, g.size, dimension);	
 	write_profile("profile.txt", profile);		
