@@ -183,6 +183,15 @@ int main ( void ){
 	float *X_device;
 	float *M_device;
 	float *U_device, *VT_device, *Si_device;
+	int rank = 2;
+
+	float *W_device;
+	float *e_device;
+	float *E_device;
+
+	cudaMalloc((void **)&W_device, sizeof(float) * g.size);
+	cudaMalloc((void **)&e_device, sizeof(float) * rank);
+	cudaMalloc((void **)&E_device, sizeof(float) * g.size * rank);
 
 	cudaMalloc(&U_device, size);
 	cudaMalloc(&Si_device, g.size * sizeof(float));
@@ -248,15 +257,6 @@ int main ( void ){
 
 	/* Eigen decomposition of X */
 	log("Eigen Decomposition of X");
-	int rank = 2;
-
-	float *W_device;
-	float *e_device;
-	float *E_device;
-
-	cudaMalloc((void **)&W_device, sizeof(float) * g.size);
-	cudaMalloc((void **)&e_device, sizeof(float) * rank);
-	cudaMalloc((void **)&E_device, sizeof(float) * g.size * rank);
 
 	cusolverDnSsyevd_bufferSize(cusolverH,jobz, uplo, g.size, X_device, g.size, W_device, &lwork);
 	cudaMalloc(&d_work, sizeof(float) * lwork);
