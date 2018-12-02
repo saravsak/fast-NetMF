@@ -83,6 +83,7 @@ __global__ void filter_e(float *W, float *e, int size, int window_size, int rank
 	      val = (el * (1 - powf(el, window_size))) / ((1-el) * window_size);
 	      e[id] = 0 > val ? 0: val;
 	}
+	e[id] = sqrt(e[id]);
 
 }
 
@@ -170,7 +171,7 @@ int main ( void ){
 
 	int size = g.size * g.size * sizeof(float);
 	int b = 1;
-	int dimension = 128;
+	int dimension = 2;
 	profile.dimension = dimension;
 	int *devInfoH;
 	
@@ -324,6 +325,7 @@ int main ( void ){
 		    D_device, g.size + 1,
 		    temp_device, g.size);
 
+	std::cout<<"Value of D_rt_invU"<<std::endl;
 	cudaMemcpy(W, temp_device, g.size * rank * sizeof(float), cudaMemcpyDeviceToHost);	
 
 	std::cout<<std::endl<<std::endl;
@@ -335,28 +337,51 @@ int main ( void ){
 	}	
 
 	cublasSdgmm(handle,
-		    CUBLAS_SIDE_LEFT,
+		    CUBLAS_SIDE_RIGHT,
 		    g.size, rank,
 		    temp_device, g.size,
 		    e_device, 1,
 		    M_device, g.size);
 
+	float *M = (float *)malloc( g.size * rank * sizeof(float));
+	
+	cudaMemcpy(M, M_device, g.size * rank * sizeof(float), cudaMemcpyDeviceToHost);
+
+	print_matrix(M, g.size);
+
 	//TODO: Perform MMT here - mmT = T.dot(m, m.T) * (vol/b)
+
+	float *MMT, *MMT_device;
+	cudaMalloc(&MMT_device, size);
+
+	cublasSgemm(handle, 
+		    CUBLAS_OP_N, CUBLAS_OP_T, 
+		    g.size, rank, g.size,
+		    &al,
+	            M_device,g.size, 
+		    M_device, g.size,
+		    &bet, 
+		    MMT_device, g.size);
 
 	float scale = float(g.volume)/float(b);
 
 	cublasSscal(handle, g.size * g.size,
 			&scale,
-			M_device, 
+			MMT_device, 
 			1);
 	
 	signed char jobu = 'A';
 	signed char jobvt = 'N';
+	
+	float *Embedding, *Embedding_device;
 
+	cudaMalloc(&Embedding_device, g.size * dimension *sizeof(float));
+	Embedding = (float *)malloc(g.size * dimension * sizeof(float));
+	
 	transform_m<<<grid,threads>>>(M_device, g.size);
 	
 	cusolverDnSgesvd(cusolverH, jobu, jobvt, 
-			g.size, g.size, M_device, g.size, 
+			g.size, g.size, MMT_device, g.size, 
 			Si_device, 
 			U_device, g.size, 
 			VT_device, g.size, 
@@ -367,17 +392,20 @@ int main ( void ){
 		
 	sqrt_si<<<grid, threads>>>(Si_device, dimension);	
 	cublasSdgmm(handle, 
-	    CUBLAS_SIDE_LEFT, 
+	    CUBLAS_SIDE_RIGHT, 
 	    g.size, dimension,
 	    U_device, g.size,
 	    Si_device,1, 
-	    W_device, g.size);
+	    Embedding_device, g.size);
 		
         cudaDeviceSynchronize();
-	cudaMemcpy(W, W_device, size, cudaMemcpyDeviceToHost);
+
+	
+
+	cudaMemcpy(Embedding, Embedding_device, size, cudaMemcpyDeviceToHost);
 
 
-	write_embeddings("blogcatalog.emb",W, g.size, dimension);	
+	write_embeddings("blogcatalog.emb",Embedding, g.size, dimension);	
 	write_profile("profile.txt", profile);		
 	log("Done");
 	/***********
