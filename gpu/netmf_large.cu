@@ -345,6 +345,7 @@ int main ( void ){
 
 	float *M = (float *)malloc( g.size * rank * sizeof(float));
 	
+	std::cout<<"evals * d_rt_invU"<<std::endl;
 	cudaMemcpy(M, M_device, g.size * rank * sizeof(float), cudaMemcpyDeviceToHost);
 
 	print_matrix(M, g.size);
@@ -353,22 +354,28 @@ int main ( void ){
 
 	float *MMT, *MMT_device;
 	cudaMalloc(&MMT_device, size);
-
+	cudaMemset(MMT_device, 0, size);
+	MMT = (float *) malloc(size);
+	memset(MMT, 0, size);
 	cublasSgemm(handle, 
 		    CUBLAS_OP_N, CUBLAS_OP_T, 
-		    g.size, rank, g.size,
+		    g.size, g.size, g.size,
 		    &al,
 	            M_device,g.size, 
 		    M_device, g.size,
 		    &bet, 
 		    MMT_device, g.size);
 
-	float scale = float(g.volume)/float(b);
-
+	const float scale = float(g.volume)/float(b);
+	cudaDeviceSynchronize();	
 	cublasSscal(handle, g.size * g.size,
 			&scale,
 			MMT_device, 
 			1);
+
+	cudaMemcpy(MMT, MMT_device, size, cudaMemcpyDeviceToHost);
+	std::cout<<"Value of MMT";
+	print_matrix(MMT, g.size);
 	
 	signed char jobu = 'A';
 	signed char jobvt = 'N';
