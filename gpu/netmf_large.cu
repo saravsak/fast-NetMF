@@ -287,7 +287,6 @@ int main ( void ){
 	filter_e<<<grid, threads>>>(W_device, e_device, g.size, window_size, rank);
 	
 	filter_E<<<grid, threads>>>(X_device, E_device, g.size, rank);	
-	//cudaMemcpy(E_device, X_device + ptr, rank * g.size * sizeof(float), cudaMemcpyDeviceToDevice);
 
 	float *D;
 	D = (float *)malloc(g.size * g.size * sizeof(float));
@@ -297,24 +296,6 @@ int main ( void ){
 	cudaMemcpy(e,e_device, rank*sizeof(float), cudaMemcpyDeviceToHost);
 	cudaMemcpy(X,X_device, g.size * g.size*sizeof(float), cudaMemcpyDeviceToHost);
 
-	//std::cout<<std::endl<<std::endl<<"Value of D"<<std::endl;
-	//print_matrix(D, g.size);
-
-	//std::cout<<"Value of EV";
-	//print_matrix(X, g.size);
-
-	//std::cout<<std::endl<<std::endl<<"Value of E"<<std::endl;
-	//for(int i=0;i<rank;i++){
-	//	for(int j=0;j<g.size;j++){
-	//		std::cout<<E[i*g.size + j]<<" ";
-	//	}
-	//	std::cout<<std::endl;
-	//}		
-
-	//std::cout<<std::endl<<std::endl<<"Value of e"<<std::endl;
-	//for(int i=0;i<g.size;i++){
-	//	std::cout<<e[i]<<" ";
-	//}
 
 	cudaMemset(temp_device, 0, g.size * g.size * sizeof(float));
 
@@ -325,16 +306,7 @@ int main ( void ){
 		    D_device, g.size + 1,
 		    temp_device, g.size);
 
-	//std::cout<<"Value of D_rt_invU"<<std::endl;
 	cudaMemcpy(W, temp_device, g.size * rank * sizeof(float), cudaMemcpyDeviceToHost);	
-
-	//std::cout<<std::endl<<std::endl;
-	//for(int i=0;i<g.size;i++){
-	//	for(int j=0; j<g.size; j++){
-	//		std::cout<<W[i*g.size+j]<<" ";
-	//	}
-	//	std::cout<<'\n';
-	//}	
 
 	cublasSdgmm(handle,
 		    CUBLAS_SIDE_RIGHT,
@@ -345,12 +317,7 @@ int main ( void ){
 
 	float *M = (float *)malloc( g.size * rank * sizeof(float));
 	
-	//std::cout<<"evals * d_rt_invU"<<std::endl;
 	cudaMemcpy(M, M_device, g.size * rank * sizeof(float), cudaMemcpyDeviceToHost);
-
-	//print_matrix(M, g.size);
-
-	//TODO: Perform MMT here - mmT = T.dot(m, m.T) * (vol/b)
 
 	float *MMT, *MMT_device;
 	cudaMalloc(&MMT_device, size);
@@ -374,8 +341,6 @@ int main ( void ){
 			1);
 
 	cudaMemcpy(MMT, MMT_device, size, cudaMemcpyDeviceToHost);
-	//std::cout<<"Value of MMT";
-	//print_matrix(MMT, g.size);
 	
 	signed char jobu = 'A';
 	signed char jobvt = 'N';
@@ -387,8 +352,6 @@ int main ( void ){
 	
 	transform_m<<<grid,threads>>>(MMT_device, g.size);
 	cudaMemcpy(MMT, MMT_device, size, cudaMemcpyDeviceToHost);
-	//std::cout<<"Value of MMT";
-	//print_matrix(MMT, g.size);
 
 	float *U, *Si;
 	U = (float *)malloc(g.size * g.size * sizeof(float));
@@ -408,14 +371,6 @@ int main ( void ){
 	cudaMemcpy(U, U_device, g.size * g.size *sizeof(float), cudaMemcpyDeviceToHost);
 	cudaMemcpy(Si, Si_device, g.size *sizeof(float), cudaMemcpyDeviceToHost);
 
-	std::cout<<"\nValue of U"<<std::endl;	
-	//print_matrix(U, g.size);
-
-	std::cout<<"\nValue of Si"<<std::endl;
-	for(int i=0;i<g.size;i++){
-		std::cout<<Si[i]<<" ";
-	}	
-	
 	sqrt_si<<<grid, threads>>>(Si_device, dimension);
 	cublasSdgmm(handle, 
 	    CUBLAS_SIDE_RIGHT, 
