@@ -389,6 +389,11 @@ int main ( void ){
 	cudaMemcpy(MMT, MMT_device, size, cudaMemcpyDeviceToHost);
 	std::cout<<"Value of MMT";
 	print_matrix(MMT, g.size);
+
+	float *U, *Si;
+	U = (float *)malloc(g.size * g.size * sizeof(float));
+	Si = (float *)malloc(g.size * sizeof(float));
+
 	
 	cusolverDnSgesvd(cusolverH, jobu, jobvt, 
 			g.size, g.size, MMT_device, g.size, 
@@ -399,20 +404,30 @@ int main ( void ){
 			lwork, 
 			d_rwork, 
 			devInfo); 
-		
-	sqrt_si<<<grid, threads>>>(Si_device, dimension);	
+	
+	cudaMemcpy(U, U_device, g.size * g.size *sizeof(float), cudaMemcpyDeviceToHost);
+	cudaMemcpy(Si, Si_device, g.size *sizeof(float), cudaMemcpyDeviceToHost);
+
+	std::cout<<"\nValue of U"<<std::endl;	
+	print_matrix(U, g.size);
+
+	std::cout<<"\nValue of Si"<<std::endl;
+	for(int i=0;i<g.size;i++){
+		std::cout<<Si[i]<<" ";
+	}	
+	
+	sqrt_si<<<grid, threads>>>(Si_device, dimension);
 	cublasSdgmm(handle, 
 	    CUBLAS_SIDE_RIGHT, 
 	    g.size, dimension,
 	    U_device, g.size,
-	    Si_device,1, 
+	    Si_device,-1, 
 	    Embedding_device, g.size);
 		
         cudaDeviceSynchronize();
-
 	
 
-	cudaMemcpy(Embedding, Embedding_device, size, cudaMemcpyDeviceToHost);
+	cudaMemcpy(Embedding, Embedding_device,sizeof(float)* g.size * dimension, cudaMemcpyDeviceToHost);
 
 
 	write_embeddings("blogcatalog.emb",Embedding, g.size, dimension);	
