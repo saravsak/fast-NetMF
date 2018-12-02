@@ -183,11 +183,16 @@ int main ( void ){
 	float *temp_device;
 	float *X_device;
 	float *M_device;
+	float *U_device, *VT_device, *Si_device;
 
+	cudaMalloc(&U_device, size);
+	cudaMalloc(&Si_device, g.size * sizeof(float));
+	cudaMalloc(&VT_device, size);
 	cudaMalloc(&D_device, size);
 	cudaMalloc(&A_device, size);
 	cudaMalloc(&X_device, size);
 	cudaMalloc(&temp_device, size);
+	cudaMalloc(&M_device, size);
 
 	cudaMemset(A_device, 0, size);
 	cudaMemset(D_device, 0, size);
@@ -338,12 +343,17 @@ int main ( void ){
 
 	//TODO: Perform MMT here - mmT = T.dot(m, m.T) * (vol/b)
 
+	float scale = float(g.volume)/float(b);
+
 	cublasSscal(handle, g.size * g.size,
-			float(vol)/float(b)
+			&scale,
 			M_device, 
 			1);
+	
+	signed char jobu = 'A';
+	signed char jobvt = 'N';
 
-	transform_m(M_device, g.size);
+	transform_m<<<grid,threads>>>(M_device, g.size);
 	
 	cusolverDnSgesvd(cusolverH, jobu, jobvt, 
 			g.size, g.size, M_device, g.size, 
