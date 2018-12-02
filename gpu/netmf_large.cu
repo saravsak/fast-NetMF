@@ -137,7 +137,6 @@ int main ( void ){
 	/* CUDA housekeeping */
 	log("Running Initialization routine");
 	log("Defining Threads");
-
 	begin = Clock::now();
 	float num_threads = 128;	
 	dim3 threads(num_threads);
@@ -153,33 +152,33 @@ int main ( void ){
 	/* cuSolver housekeeping */
 	log("Setting up cuSolver");	
 	int lwork = 0;
-	cusolverEigMode_t jobz = CUSOLVER_EIG_MODE_VECTOR;
-	cublasFillMode_t uplo = CUBLAS_FILL_MODE_LOWER;
 	float *d_work, *d_rwork;
 	int *devInfo;
 	signed char jobu = 'A';
 	signed char jobvt = 'N';
 	
+	cusolverEigMode_t jobz = CUSOLVER_EIG_MODE_VECTOR;
+	cublasFillMode_t uplo = CUBLAS_FILL_MODE_LOWER;
 	cudaMalloc(&devInfo, sizeof(int));
 	cusolverDnHandle_t cusolverH;
 	cusolverDnCreate(&cusolverH);
 
 	/* Initialize and allocate variables */
 	log("Setting up host variables");
-	float *X;
-	float *MMT;
-	float *Embedding;
-	
+
 	int window_size = 10;
 	profile.window_size = window_size;
-
-	int size = g.size * g.size * sizeof(float);
 	int b = 1;
 	int rank = 2;
 	int dimension = 2;
 	const float scale = float(g.volume)/float(b);
+	int size = g.size * g.size * sizeof(float);
 	profile.dimension = dimension;
 	
+	float *X;
+	float *MMT;
+	float *Embedding;
+
 	X = (float *)malloc(size);
 	MMT = (float *) malloc(size);
 	Embedding = (float *)malloc(g.size * dimension * sizeof(float));
@@ -195,35 +194,25 @@ int main ( void ){
 	float *X_device;
 	float *M_device;
 	float *U_device, *VT_device, *Si_device;
-
 	float *W_device;
 	float *e_device;
 	float *E_device;
 	float *MMT_device;
-	
 	float *Embedding_device;
-
-	cudaMalloc(&Embedding_device, g.size * dimension *sizeof(float));
-
-	cudaMalloc(&MMT_device, size);
+	
+	cudaMalloc((void **)&Embedding_device, g.size * dimension *sizeof(float));
+	cudaMalloc((void **)&MMT_device, size);
 	cudaMalloc((void **)&W_device, sizeof(float) * g.size);
 	cudaMalloc((void **)&e_device, sizeof(float) * rank);
 	cudaMalloc((void **)&E_device, sizeof(float) * g.size * rank);
-
-	cudaMalloc(&U_device, size);
-	cudaMalloc(&Si_device, g.size * sizeof(float));
-	cudaMalloc(&VT_device, size);
-	cudaMalloc(&D_device, size);
-	cudaMalloc(&A_device, size);
-	cudaMalloc(&X_device, size);
-	cudaMalloc(&temp_device, size);
-	cudaMalloc(&M_device, size);
-
-	cudaMemset(MMT_device, 0, size);
-	cudaMemset(A_device, 0, size);
-	cudaMemset(D_device, 0, size);
-	cudaMemset(X_device, 0, size);
-	cudaMemset(temp_device, 0, size);
+	cudaMalloc((void**)&U_device, size);
+	cudaMalloc((void**)&Si_device, g.size * sizeof(float));
+	cudaMalloc((void**)&VT_device, size);
+	cudaMalloc((void**)&D_device, size);
+	cudaMalloc((void**)&A_device, size);
+	cudaMalloc((void**)&X_device, size);
+	cudaMalloc((void**)&temp_device, size);
+	cudaMalloc((void**)&M_device, size);
 
 	end = Clock::now();
 	profile.init = std::chrono::duration_cast<milliseconds>(end - begin);
@@ -289,8 +278,10 @@ int main ( void ){
 	
 	log("Filtering eigenvalues and eigen vectors");
 	filter_e<<<grid, threads>>>(W_device, e_device, g.size, window_size, rank);
+	cudaDeviceSynchronize();	
 	
 	filter_E<<<grid, threads>>>(X_device, E_device, g.size, rank);	
+	cudaDeviceSynchronize();	
 
 	cudaMemset(temp_device, 0, g.size * g.size * sizeof(float));
 
@@ -300,7 +291,7 @@ int main ( void ){
 		    E_device, g.size,
 		    D_device, g.size + 1,
 		    temp_device, g.size);
-
+	cudaDeviceSynchronize();	
 
 	cublasSdgmm(handle,
 		    CUBLAS_SIDE_RIGHT,
@@ -308,6 +299,7 @@ int main ( void ){
 		    temp_device, g.size,
 		    e_device, 1,
 		    M_device, g.size);
+	cudaDeviceSynchronize();	
 
 	cublasSgemm(handle, 
 		    CUBLAS_OP_N, CUBLAS_OP_T, 
@@ -323,9 +315,10 @@ int main ( void ){
 			&scale,
 			MMT_device, 
 			1);
-
+	cudaDeviceSynchronize();	
 	
 	transform_m<<<grid,threads>>>(MMT_device, g.size);
+	cudaDeviceSynchronize();	
 	
 	cusolverDnSgesvd(cusolverH, jobu, jobvt, 
 			g.size, g.size, MMT_device, g.size, 
@@ -336,9 +329,11 @@ int main ( void ){
 			lwork, 
 			d_rwork, 
 			devInfo); 
+	cudaDeviceSynchronize();	
 	
 
 	sqrt_si<<<grid, threads>>>(Si_device, dimension);
+	cudaDeviceSynchronize();	
 	cublasSdgmm(handle, 
 	    CUBLAS_SIDE_RIGHT, 
 	    g.size, dimension,
