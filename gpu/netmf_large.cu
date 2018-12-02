@@ -280,9 +280,6 @@ int main ( void ){
 	
 	cudaDeviceSynchronize();
 	
-	cudaMemcpy(W, W_device, g.size * sizeof(float), cudaMemcpyDeviceToHost);
-	cudaMemcpy(devInfoH, devInfo, sizeof(int), cudaMemcpyDeviceToHost);
-
 	log("Filtering eigenvalues and eigen vectors");
 	filter_e<<<grid, threads>>>(W_device, e_device, g.size, window_size, rank);
 	
