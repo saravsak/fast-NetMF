@@ -122,14 +122,14 @@ int main ( void ){
 	typedef std::chrono::milliseconds milliseconds;
         Clock::time_point begin, end;
 	info profile; 
-	profile.dataset = "blogcatalog";
+	profile.dataset = "ppi";
 	profile.algo = "large";
 
 	/* Load graph */
         log("Reading data from file");
 
         begin = Clock::now(); 
-	Graph g =  read_graph("../data/test/small_test.csv","edgelist");
+	Graph g =  read_graph("../data/ppi/ppi.edgelist","edgelist");
         end = Clock::now(); 
 
 	profile.iptime = std::chrono::duration_cast<milliseconds>(end - begin);	
@@ -169,8 +169,8 @@ int main ( void ){
 	int window_size = 10;
 	profile.window_size = window_size;
 	int b = 1;
-	int rank = 2;
-	int dimension = 2;
+	int rank = 256;
+	int dimension = 128;
 	const float scale = float(g.volume)/float(b);
 	int size = g.size * g.size * sizeof(float);
 	profile.dimension = dimension;
@@ -357,7 +357,7 @@ int main ( void ){
 	end = Clock::now();
 	profile.emb = std::chrono::duration_cast<milliseconds>(end - begin);	
 
-	write_embeddings("blogcatalog.emb",Embedding, g.size, dimension);	
+	write_embeddings("ppi.emb",Embedding, g.size, dimension);	
 	write_profile("profile.txt", profile);		
 	log("Done");
 	/***********
