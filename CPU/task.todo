@@ -1,0 +1,31 @@
+
+
+Bug: 
+    ☐ check for complementary -ve signs in output
+
+Todo:
+   ✔ netmf large in approximation remove negetive values python code line @done (18-11-23 20:18)
+   ✔ boost show time difference @done (18-11-23 20:18)
+   ✔ Optimize and then do these -- small and large matrices , 1-32 threads, @done (18-11-23 20:19)  
+   ☐ add big o complexity:
+       -- Eigen package eigen solver complxity:  http://eigen.tuxfamily.org/dox/classEigen_1_1SelfAdjointEigenSolver.html#adf397f6bce9f93c4b0139a47e261fc24
+        
+
+
+   ☐ memory complexity --num of non zeros
+   ☐ wether the matrices are: 
+       ☐ symmetric 
+       ☐ hermitan
+             -- If A is Hermitian and full-rank, the basis of eigenvectors may be chosen to be mutually orthogonal. The eigenvalues are real.
+       ☐ positive definite
+       ☐ positive semi definite
+       
+   ------------------------
+   ☐ try algo runs with 28 threads
+   ☐ 
+
+
+
+
+
+
