@@ -1,6 +1,6 @@
 #PBS -N FNMF
 #PBS -A PAS1425
-#PBS -l walltime=00:12:00
+#PBS -l walltime=00:20:00
 #PBS -l nodes=1:ppn=28:gpus=1
 #PBS -j oe
 
@@ -9,4 +9,4 @@ set -x
 
 module load cuda
 
-./netmf_small
+./netmf_large
