@@ -4,7 +4,7 @@
 *.ptx
 *.cubin
 *.fatbin
-
+data/
 CPU/build
 CPU/datasets
 CPU/dist
@@ -25,4 +25,3 @@ CPU/todo.md
 CPU/6_run_set
 CPU/*.png
 CPU/slurm*
-
