@@ -133,7 +133,6 @@
     intel optimization
        use icc (intels) compilercheck http://eigen.tuxfamily.org/dox/TopicUsingIntelMKL.html 
 
-
 # enable vectorization
 
     http://eigen.tuxfamily.org/index.php?title=FAQ#How_can_I_enable_vectorization.3F
@@ -187,7 +186,7 @@
 
 # my PC build command
 
-g++ -std=c++11 -march=native netmf_eigen.cpp -o netmf_eigen -I /home/mohit/Documents/boost_1_61_0 -I /home/mohit/Documents/eigen_cpp_installation -I /home/mohit/Documents/spectra_installation/include/Spectra -L /home/mohit/Documents/boost_1_61_0/lib -L /home/mohit/Documents/expat-2.0.1/lib -O3 -DEIGEN_NO_DEBUG -fopenmp  -lboost_graph -lboost_regex -lexpat -lboost_timer -lboost_program_options -lboost_filesystem -lboost_system -Wl,-rpath=/home/mohit/Documents/boost_1_61_0/lib -Wl,-rpath=/home/mohit/Documents/expat-2.0.1/lib
+    g++ -std=c++11 -march=native netmf_eigen.cpp -o netmf_eigen -I /home/mohit/Documents/boost_1_61_0 -I /home/mohit/Documents/eigen_cpp_installation -I /home/mohit/Documents/spectra_installation/include/Spectra -L /home/mohit/Documents/boost_1_61_0/lib -L /home/mohit/Documents/expat-2.0.1/lib -O3 -DEIGEN_NO_DEBUG -fopenmp  -lboost_graph -lboost_regex -lexpat -lboost_timer -lboost_program_options -lboost_filesystem -lboost_system -Wl,-rpath=/home/mohit/Documents/boost_1_61_0/lib -Wl,-rpath=/home/mohit/Documents/expat-2.0.1/lib
 
 # How command line work
     
@@ -242,3 +241,54 @@ g++ -std=c++11 -march=native netmf_eigen.cpp -o netmf_eigen -I /home/mohit/Docum
 # Symmetric Matrix
     All symmetric properties can be proved using following three properties
     1.  
+
+
+# netmf Sparse code optimization
+    
+    1. insert into adjacency_list in two ways, see Filling a sparse matrix section https://eigen.tuxfamily.org/dox/group__TutorialSparse.html
+
+    2. for each of above 
+        insert only half trigular and create A by adding transpose   VS  add non zeros at once
+    3. convert std math function sqrt max log to boost multiprecision
+    4. Directly feed normalized adj matrix to eigen solver
+    5. Mcap is still a dense matrix. Can be utilized for space efficiency until Mcap log max function
+
+    6. combining m cap multiplication
+    7. remove reverse operation and -ve sign in eigen solved values 
+    8. Mcap log max uniary function can be done in place. Check if other fall in this category as well. 
+    9. In RedSVD-h disable V calculation. 
+
+#
+jangid.6@head ~/work ❯❯❯ sbatch js_24_threads.sh
+Submitted batch job 151662
+jangid.6@head ~/work ❯❯❯ sbatch js_24_threads.sh
+Submitted batch job 151663
+jangid.6@head ~/work ❯❯❯ sbatch js_24_threads.sh
+Submitted batch job 151664
+jangid.6@head ~/work ❯❯❯ sbatch js_24_threads.sh
+Submitted batch job 151665
+jangid.6@head ~/work ❯❯❯ sbatch js_24_threads.sh
+Submitted batch job 151666
+jangid.6@head ~/work ❯❯❯ sbatch js_24_threads.sh
+Submitted batch job 151667
+jangid.6@head ~/work ❯❯❯ squeue -u jangid.6
+             JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)
+            151662     devel ppi_blog jangid.6  R       0:12      1 gpu01
+            151663     devel ppi_blog jangid.6  R       0:09      1 storage03
+            151664     devel ppi_blog jangid.6  R       0:09      1 storage04
+            151665     devel ppi_blog jangid.6  R       0:06      1 storage11
+            151666     devel ppi_blog jangid.6  R       0:06      1 storage12
+            151667     devel ppi_blog jangid.6  R       0:03      1 storage13
+
+
+jangid.6@head ~/work ❯❯❯ squeue -u jangid.6
+             JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)
+            151679     batch ppi_blog jangid.6  R       0:59      1 storage04
+            151680     batch ppi_blog jangid.6  R       0:22      1 storage11
+            151681     batch ppi_blog jangid.6  R       0:19      1 storage12
+            151682     batch ppi_blog jangid.6  R       0:14      1 storage13
+            151683     batch ppi_blog jangid.6  R       0:08      1 storage14
+            151684     batch ppi_blog jangid.6  R       0:01      1 storage16
+
+
+     

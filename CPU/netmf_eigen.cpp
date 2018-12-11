@@ -22,6 +22,7 @@
 #include <boost/timer/timer.hpp>
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/regex.hpp>
 
 namespace fs = boost::filesystem;
 using namespace boost;
@@ -67,7 +68,7 @@ float summation_approximate(float x)
 	// netmf logic
 	//  evals[i] = 1. if x >= 1 else x*(1-x**window) / (1-x) / window
 
-	if (x > 1)
+	if (x >= 1)
 		return 1 ;
 	else
 		//https://en.cppreference.com/w/c/numeric/math/pow
@@ -355,7 +356,8 @@ int main(int argc, char *argv[])
 		// cout << "Num Threads :" << Eigen::nbThreads( ) << endl; 
 
 
-		print_prefix = dataset_name.string() + ",, " + graph_size + ",, " + to_string(Eigen::nbThreads( )); 
+		print_prefix = boost::regex_replace(dataset_name.string(), boost::regex(".graphml"), "") + ",, " + graph_size + ",, " + to_string(Eigen::nbThreads( ));
+
 		print_timer("Graph Loaded from file", timer);
 
 		MatrixXf A =  MatrixXf::Zero(num_nodes, num_nodes);
@@ -379,12 +381,17 @@ int main(int argc, char *argv[])
 		// cout << "Final Embeddings are :" << endl << network_embedding << endl ;
 		print_timer("Embedding Ready" , timer);
 
-		fs::path embedding_file_path =  dataset_folder / dataset_name.replace_extension(".embedding") ;
+		string embedding_file_name = boost::regex_replace(dataset_name.string(), boost::regex(".graphml"), "") + "_" + graph_size + "_" + to_string(Eigen::nbThreads( )) + ".embedding"; 
+
+		fs::path embedding_file_path =  dataset_folder / fs::path(embedding_file_name) ;
 		std::ofstream file(embedding_file_path.string());
 
 		if (file.is_open())
 		{
-			file << network_embedding ;
+			
+			
+			IOFormat space_separated(FullPrecision, DontAlignCols, " ", "\n", "", "", "", "");
+			file << network_embedding.format(space_separated) ;
 		} else {
 
 			throw "Opening file (" + embedding_file_path.string() + ") failed. Could not write embedding file.";

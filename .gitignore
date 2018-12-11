@@ -26,3 +26,7 @@ CPU/6_run_set
 CPU/*.png
 CPU/slurm*
 
+CPU/.gdb_history
+CPU/.idea/
+CPU/embb_quality_check/
+CPU/netmf_sparse

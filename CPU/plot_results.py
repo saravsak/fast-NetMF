@@ -42,7 +42,7 @@ def stacked_bar(data, series_labels, category_labels=None,
                             label=series_labels[i], color = stack_colors[i]) )
         cum_size += row_data
 
-    if category_labels:
+    if category_labels is not None:
         plt.xticks(ind, category_labels, fontsize=14)
 
     if y_label:
@@ -67,10 +67,10 @@ def stacked_bar(data, series_labels, category_labels=None,
 
 # https://docs.scipy.org/doc/numpy-1.13.0/reference/arrays.dtypes.html
 # https://jakevdp.github.io/PythonDataScienceHandbook/04.08-multiple-subplots.html
-data_array= np.loadtxt("/home/mohit/Dropbox/spring_2019_MILE_project/netbeans/fast-NetMF/CPU/6_run_set/averaged.csv", dtype=np.dtype([('dataset', 'U50'),
+data_array= np.loadtxt("/home/mohit/Dropbox/spring_2019_MILE_project/netbeans/fast-NetMF/CPU/6_run_set/averaged_wave2.csv", dtype=np.dtype([('dataset', 'U50'),
                                                            ('graph_size','U50'),
                                                            ('step','U100'),
-                                                           ('num_threads','i'),
+                                                           ('num_threads','int'),
                                                            ('wall','f'),
 
 
@@ -82,7 +82,7 @@ data_array= np.loadtxt("/home/mohit/Dropbox/spring_2019_MILE_project/netbeans/fa
 
 a = np.array([list(item) for item in data_array])
 
-dataset = 'PPI'
+dataset = 'Blog'
 graph_size = 'large'
 
 dataset_info = {
@@ -92,27 +92,30 @@ dataset_info = {
 
 stack_colors = [ 'darkgrey',  'green', 'maroon' , 'mediumpurple', 'coral' , 'slateblue']
 
-load_graph_values = a[ (a[:,0] == dataset) &  (a[:,1] == graph_size) & (a[:,2] == 'Graph Loaded from file')][:,4]
-norm_adj = a[ (a[:,0] == dataset) &  (a[:,1] == graph_size) & (a[:,2] == 'Normalized Adjacency Matrix')][:,4]
-eigen_large_values = a[ (a[:,0] == dataset) &  (a[:,1] == graph_size) & (a[:,2] == 'Eigen Decomposition')][:,4]
-m_approx_values = a[ (a[:,0] == dataset) &  (a[:,1] == graph_size) & (a[:,2] == 'Approximated M')][:,4]
-svd_large_values = a[ (a[:,0] == dataset) &  (a[:,1] == graph_size) & (a[:,2] == 'SVD')][:,4]
-write_graph_values =a[ (a[:,0] == dataset) &  (a[:,1] == graph_size) & (a[:,2] == 'Embedding Written to file')][:,4]
+load_graph_values = a[ (a[:,0] == dataset) &  (a[:,1] == graph_size) & (a[:,2] == 'Graph Loaded from file')][:,3:5].astype(float)
+norm_adj = a[ (a[:,0] == dataset) &  (a[:,1] == graph_size) & (a[:,2] == 'Normalized Adjacency Matrix')][:,3:5].astype(float)
+eigen_large_values = a[ (a[:,0] == dataset) &  (a[:,1] == graph_size) & (a[:,2] == 'Eigen Decomposition')][:,3:5].astype(float)
 
-np.array(load_graph_values, dtype = 'f')
+m_approx_values = a[ (a[:,0] == dataset) &  (a[:,1] == graph_size) & (a[:,2] == 'Approximated M')][:,3:5].astype(float)
+svd_large_values = a[ (a[:,0] == dataset) &  (a[:,1] == graph_size) & (a[:,2] == 'SVD')][:,3:5].astype(float)
+write_graph_values =a[ (a[:,0] == dataset) &  (a[:,1] == graph_size) & (a[:,2] == 'Embedding Written to file')][:,3:5].astype(float)
+
 
 series_labels = ['Load Graph', 'Normalized A', 'Eigen Decompse' , 'Approx M' , 'SVD' , 'Write Embb' ]
 
 data = [
-    np.array( load_graph_values, dtype = 'f'),
-    np.array( norm_adj,  dtype = 'f'),
-    np.array( eigen_large_values,  dtype = 'f'),
-    np.array( m_approx_values, dtype = 'f'),
-    np.array( svd_large_values, dtype = 'f'),
-    np.array( write_graph_values, dtype = 'f')
+    load_graph_values[load_graph_values[:,0].argsort()][:,1],
+    norm_adj[norm_adj[:,0].argsort()][:,1],
+    eigen_large_values[eigen_large_values[:,0].argsort()][:,1],
+    m_approx_values[m_approx_values[:,0].argsort()][:,1],
+    svd_large_values[svd_large_values[:,0].argsort()][:,1],
+    write_graph_values[write_graph_values[:,0].argsort()][:,1],
 ]
 
-category_labels = ['1', '2', '4', '8' , '16', '32']
+
+
+# category_labels = ['1', '2', '4', '8' , '16', '24', '28', '32']
+category_labels = np.array(load_graph_values[load_graph_values[:,0].argsort()][:,0].astype(int), 'U')
 
 stacked_bar(
     data,
