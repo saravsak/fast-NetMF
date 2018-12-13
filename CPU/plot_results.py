@@ -67,7 +67,7 @@ def stacked_bar(data, series_labels, category_labels=None,
 
 # https://docs.scipy.org/doc/numpy-1.13.0/reference/arrays.dtypes.html
 # https://jakevdp.github.io/PythonDataScienceHandbook/04.08-multiple-subplots.html
-data_array= np.loadtxt("/home/mohit/Dropbox/spring_2019_MILE_project/netbeans/fast-NetMF/CPU/6_run_set/averaged_wave2.csv", dtype=np.dtype([('dataset', 'U50'),
+data_array= np.loadtxt("/home/mohit/Dropbox/spring_2019_MILE_project/netbeans/fast-NetMF/CPU/6_run_set/averaged_wave3.csv", dtype=np.dtype([('dataset', 'U50'),
                                                            ('graph_size','U50'),
                                                            ('step','U100'),
                                                            ('num_threads','int'),
@@ -82,7 +82,7 @@ data_array= np.loadtxt("/home/mohit/Dropbox/spring_2019_MILE_project/netbeans/fa
 
 a = np.array([list(item) for item in data_array])
 
-dataset = 'Blog'
+dataset = 'PPI'
 graph_size = 'large'
 
 dataset_info = {
@@ -90,10 +90,11 @@ dataset_info = {
   'Blog': ' (|V|= 10,312, |E| = 333,983) ',
 }
 
-stack_colors = [ 'darkgrey',  'green', 'maroon' , 'mediumpurple', 'coral' , 'slateblue']
+# stack_colors = [ 'darkgrey',  'green', 'maroon' , 'mediumpurple', 'coral' , 'slateblue']
+stack_colors = [ 'darkgrey',  'maroon' , 'mediumpurple', 'coral' , 'slateblue']
 
 load_graph_values = a[ (a[:,0] == dataset) &  (a[:,1] == graph_size) & (a[:,2] == 'Graph Loaded from file')][:,3:5].astype(float)
-norm_adj = a[ (a[:,0] == dataset) &  (a[:,1] == graph_size) & (a[:,2] == 'Normalized Adjacency Matrix')][:,3:5].astype(float)
+# norm_adj = a[ (a[:,0] == dataset) &  (a[:,1] == graph_size) & (a[:,2] == 'Normalized Adjacency Matrix')][:,3:5].astype(float)
 eigen_large_values = a[ (a[:,0] == dataset) &  (a[:,1] == graph_size) & (a[:,2] == 'Eigen Decomposition')][:,3:5].astype(float)
 
 m_approx_values = a[ (a[:,0] == dataset) &  (a[:,1] == graph_size) & (a[:,2] == 'Approximated M')][:,3:5].astype(float)
@@ -101,11 +102,12 @@ svd_large_values = a[ (a[:,0] == dataset) &  (a[:,1] == graph_size) & (a[:,2] ==
 write_graph_values =a[ (a[:,0] == dataset) &  (a[:,1] == graph_size) & (a[:,2] == 'Embedding Written to file')][:,3:5].astype(float)
 
 
-series_labels = ['Load Graph', 'Normalized A', 'Eigen Decompse' , 'Approx M' , 'SVD' , 'Write Embb' ]
+series_labels = ['Load Graph', 'Eigen Decompse' , 'Approx M' , 'SVD' , 'Write Embb' ]
+# series_labels = ['Load Graph', 'Normalized A', 'Eigen Decompse' , 'Approx M' , 'SVD' , 'Write Embb' ]
 
 data = [
     load_graph_values[load_graph_values[:,0].argsort()][:,1],
-    norm_adj[norm_adj[:,0].argsort()][:,1],
+    # norm_adj[norm_adj[:,0].argsort()][:,1],
     eigen_large_values[eigen_large_values[:,0].argsort()][:,1],
     m_approx_values[m_approx_values[:,0].argsort()][:,1],
     svd_large_values[svd_large_values[:,0].argsort()][:,1],

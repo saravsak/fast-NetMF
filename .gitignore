@@ -20,12 +20,10 @@ CPU/random_connected_graph.py
 CPU/result_set1.txt
 CPU/result.txt
 CPU/ri2_single_job_spmv_performance.sh
-CPU/todo.md
-
+CPU/comparison
 CPU/6_run_set
 CPU/*.png
 CPU/slurm*
-
 CPU/.gdb_history
 CPU/.idea/
 CPU/embb_quality_check/

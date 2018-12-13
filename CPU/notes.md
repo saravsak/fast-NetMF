@@ -184,6 +184,8 @@
 
     g++ -std=c++11 -march=native netmf_eigen.cpp -o netmf_eigen -I ~/boost_1_68_0 -I ~/eigen335 -L ~/boost_1_68_0/lib -L ~/expat-2.0.1/lib -O3 -DEIGEN_NO_DEBUG -fopenmp  -lboost_graph -lboost_regex -lexpat -lboost_timer -lboost_program_options -lboost_system -lboost_filesystem -Wl,-rpath=/home/jangid.6/boost_1_68_0/lib -Wl,-rpath=/home/jangid.6/expat-2.0.1/lib
 
+    g++ -std=c++11 -march=native netmf_sparse.cpp -o netmf_sparse -I ~/boost_1_68_0 -I ~/eigen335 -I ~/spectra/include/Spectra -L ~/boost_1_68_0/lib -L ~/expat-2.0.1/lib -O3 -DEIGEN_NO_DEBUG -fopenmp  -lboost_graph -lboost_regex -lexpat -lboost_timer -lboost_program_options -lboost_system -lboost_filesystem -Wl,-rpath=/home/jangid.6/boost_1_68_0/lib -Wl,-rpath=/home/jangid.6/expat-2.0.1/lib
+
 # my PC build command
 
     g++ -std=c++11 -march=native netmf_eigen.cpp -o netmf_eigen -I /home/mohit/Documents/boost_1_61_0 -I /home/mohit/Documents/eigen_cpp_installation -I /home/mohit/Documents/spectra_installation/include/Spectra -L /home/mohit/Documents/boost_1_61_0/lib -L /home/mohit/Documents/expat-2.0.1/lib -O3 -DEIGEN_NO_DEBUG -fopenmp  -lboost_graph -lboost_regex -lexpat -lboost_timer -lboost_program_options -lboost_filesystem -lboost_system -Wl,-rpath=/home/mohit/Documents/boost_1_61_0/lib -Wl,-rpath=/home/mohit/Documents/expat-2.0.1/lib

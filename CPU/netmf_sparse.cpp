@@ -23,6 +23,7 @@
 #include <boost/timer/timer.hpp>
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/regex.hpp>
 #include "RedSVD-h"
 
 #include <SymEigsSolver.h>
@@ -180,9 +181,9 @@ MatrixXf netmf(Eigen::SparseMatrix<float> &A, const string &graph_size, unsigned
 	// 0.57735 0.353553 0 0.5 
 	// 0 0 0.5 0 
 
-
-// 	print_timer("Normalized Adjacency Matrix", timer);
-
+	#ifdef PRINT_EXECUTION_TIME	
+	print_timer("Normalized Adjacency Matrix", timer);
+	#endif /* PRINT_EXECUTION_TIME */
 
 	MatrixXf M_cap(num_nodes, num_nodes);
 	M_cap.setZero();
@@ -450,7 +451,7 @@ int main(int argc, char *argv[])
 		unsigned long long int num_nodes = boost::num_vertices(g);
 
 
-		print_prefix = dataset_name.string() + ",, " + graph_size + ",, " + to_string(Eigen::nbThreads( )); 
+		print_prefix = boost::regex_replace(dataset_name.string(), boost::regex(".graphml"), "") + ",, " + graph_size + ",, " + to_string(Eigen::nbThreads( ));
 
 		#ifdef PRINT_EXECUTION_TIME		
 		print_timer("Graph Loaded from file", timer);
@@ -525,12 +526,17 @@ int main(int argc, char *argv[])
 		print_timer("Embedding Ready" , timer);
 		#endif /* PRINT_EXECUTION_TIME */
 
-		fs::path embedding_file_path =  dataset_folder / dataset_name.replace_extension(".embedding") ;
+		string embedding_file_name = boost::regex_replace(dataset_name.string(), boost::regex(".graphml"), "") + "_" + graph_size + "_" + to_string(Eigen::nbThreads( )) + ".embedding"; 
+
+		fs::path embedding_file_path =  dataset_folder / fs::path(embedding_file_name) ;
 		std::ofstream file(embedding_file_path.string());
 
 		if (file.is_open())
 		{
-			file << network_embedding ;
+			
+			
+			IOFormat space_separated(FullPrecision, DontAlignCols, " ", "\n", "", "", "", "");
+			file << network_embedding.format(space_separated) ;
 		} else {
 
 			throw "Opening file (" + embedding_file_path.string() + ") failed. Could not write embedding file.";

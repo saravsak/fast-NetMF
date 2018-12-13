@@ -37,6 +37,11 @@ Todo:
    ☐ check multithreading compatibility of functions
 
 
+   ☐ find out which eigen and svd functions are threads compatible
+   ☐ for flickr and youtube default rank and dim values will not work good
+   ☐ 
+
+
 
 
 
