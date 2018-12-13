@@ -25,8 +25,9 @@ void log(const char* message);
 double diff_ms(timeval t1, timeval t2);
 
 struct CSR{
-	unsigned int row_id;
-	unsigned int col_idx;
+	// Assume zero based indexing
+	unsigned int *row_id;
+	unsigned int *col_idx;
 	float *values;
 	unsigned int nnz;
 }
