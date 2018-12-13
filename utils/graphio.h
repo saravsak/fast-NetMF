@@ -1,6 +1,7 @@
 #pragma once
 
 #include "graph.h"
+#include "spgraph.h"
 #include<string>
 
 Graph read_graph(std::string, std::string);
