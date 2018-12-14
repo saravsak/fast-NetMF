@@ -42,7 +42,6 @@ void SpGraph::add_node(int node, int *neighbors, float *weight, int num_neighbor
 	}
 
 	// Add edges to adj mat
-	
 	this->adj.row_id[node] = this->num_edges;
 	
 	for(int i=0;i<num_neighbors;i++){
@@ -63,4 +62,19 @@ void SpGraph::info(){
 	std::cout<<"Sparsity: "<<num_edges/((float)this->size)<<std::endl;
 	std::cout<<"**********************************"<<std::endl;
 }
-
+void SpGraph::print_degree(){
+	std::cout<<"\nPrinting Degree matrix"<<std::endl;
+	std::cout<<"Values"<<std::endl;
+	for(int i=0;i<this->degree.nnz;i++){
+		std::cout<<this->degree.values[i]<<" ";
+	}
+	std::cout<<"\nCol Ids"<<std::endl;
+	for(int i=0;i<this->degree.nnz;i++){
+		std::cout<<this->degree.col_idx[i]<<" ";
+	}
+	std::cout<<"\nRow Ids"<<std::endl;
+	for(int i=0;i<=this->size;i++){
+		std::cout<<this->degree.row_id[i]<<" ";
+	}
+	std::cout<<'\n';
+}

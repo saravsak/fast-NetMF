@@ -16,7 +16,6 @@ TODO:
 
 #include "../utils/graph.h"
 #include "../utils/io.h"
-#include "../utils/graphio.h"
 
 __global__ void compute_d(float* deg, int size){
 	int id = blockIdx.x * blockDim.x + threadIdx.x;
