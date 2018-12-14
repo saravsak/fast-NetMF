@@ -45,7 +45,7 @@ SpGraph read_sparse_graph_from_edgelist(std::string filename){
 	int node_num = 0, source=0, target=0;
 	std::vector<std::string> nodes;
 	std::string temp;
-	unsigned int num_edges=0;	
+	int num_edges=0;	
 	while(inFile>>line){
 		
 		// Split the string into 2 nodes
@@ -88,10 +88,10 @@ SpGraph read_sparse_graph_from_edgelist(std::string filename){
 	
 	for(it = adj_list.begin(); it != adj_list.end(); it++){
 		source = it->first;
-		float temp[it->second.size];
-		memset(temp, 1.0, it->second.size); 
-		G.add_node(source, &it->second[0], temp, it->second.size);
-		delete temp[];	
+		float temp[it->second.size()];
+		memset(temp, 1.0, it->second.size()); 
+		G.add_node(source, &it->second[0], temp, it->second.size());
+		delete[] temp;	
 	} 
 
 	return G;

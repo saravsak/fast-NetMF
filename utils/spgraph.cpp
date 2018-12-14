@@ -2,19 +2,20 @@
 #include<iostream>
 #include<stdio.h>
 #include<cstring>
-SpGraph::SpGraph(unsigned int N, unsigned int nnz)
+SpGraph::SpGraph(int N, int nnz)
 {
-	this->adj.row_id = (unsigned int *) malloc((N+1) * sizeof(unsigned int));
+	this->adj.row_id = (int *) malloc((N+1) * sizeof(int));
 	this->adj.row_id[N] = nnz; // Set last element to be nnz
-	this->adj.col_idx = (unsigned int *) malloc(nnz * sizeof(unsigned int));
+	this->adj.col_idx = (int *) malloc(nnz * sizeof(int));
 	this->adj.values = (float *) malloc(nnz * sizeof(float));
 
-	this->nnz = nnz;
+	this->adj.nnz = nnz;
 
-	this->degree.row_id = (unsigned int *) malloc((N+1) * sizeof(unsigned int));
+	this->degree.row_id = (int *) malloc((N+1) * sizeof(int));
 	this->degree.row_id[N] = N; // Set last element to be nnz of degree matrix = N
-	this->degree.col_idx = (unsigned int *) malloc(N * sizeof(unsigned int));
+	this->degree.col_idx = (int *) malloc(N * sizeof(int));
 	this->degree.values = (float *) malloc(N * sizeof(float));
+	this->degree.nnz = N;
 
 	for(int i=0;i<N;i++){
 		this->degree.row_id[i] = i;
@@ -34,9 +35,9 @@ SpGraph::SpGraph(unsigned int N, unsigned int nnz)
 
 }
 
-void SpGraph::add_node(unsigned int node, unsigned int *neighbors, float *weight, unsigned int num_neighbors)
+void SpGraph::add_node(int node, int *neighbors, float *weight, int num_neighbors)
 {
-	for(unsigned int i=0;i<num_neighbors;i++){
+	for(int i=0;i<num_neighbors;i++){
 		this->volume+=weight[i];
 	}
 
@@ -44,11 +45,11 @@ void SpGraph::add_node(unsigned int node, unsigned int *neighbors, float *weight
 	
 	this->adj.row_id[node] = this->num_edges;
 	
-	for(unsigned int i=0;i<num_neighbors;i++){
+	for(int i=0;i<num_neighbors;i++){
 		this->adj.col_idx[num_edges + i] = neighbors[i];
 		this->adj.values[num_edges + i] = weight[i]; 
 		// Add edges to degree mat
-		this->degree[node] += weight[i];
+		this->degree.values[node] += weight[i];
 	}
 
 	// Update number of edges

@@ -26,8 +26,8 @@ double diff_ms(timeval t1, timeval t2);
 
 struct CSR{
 	// Assume zero based indexing
-	unsigned int *row_id;
-	unsigned int *col_idx;
+	int *row_id;
+	int *col_idx;
 	float *values;
-	unsigned int nnz;
-}
+	int nnz;
+};
