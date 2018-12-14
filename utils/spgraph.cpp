@@ -60,6 +60,7 @@ void SpGraph::info(){
 	std::cout<<"Number of nodes: "<<this->size<<std::endl;
 	std::cout<<"Number of edges: "<<std::endl;
 	std::cout<<"Sparsity: "<<num_edges/((float)this->size)<<std::endl;
+	std::cout<<"Volume: "<<this->volume<<std::endl;
 	std::cout<<"**********************************"<<std::endl;
 }
 void SpGraph::print_degree(){
@@ -78,3 +79,20 @@ void SpGraph::print_degree(){
 	}
 	std::cout<<'\n';
 }
+void SpGraph::print_graph(){
+	std::cout<<"\nPrinting Adjacency matrix"<<std::endl;
+	std::cout<<"Values"<<std::endl;
+	for(int i=0;i<this->adj.nnz;i++){
+		std::cout<<this->adj.values[i]<<" ";
+	}
+	std::cout<<"\nCol Ids"<<std::endl;
+	for(int i=0;i<this->adj.nnz;i++){
+		std::cout<<this->adj.col_idx[i]<<" ";
+	}
+	std::cout<<"\nRow Ids"<<std::endl;
+	for(int i=0;i<=this->size;i++){
+		std::cout<<this->adj.row_id[i]<<" ";
+	}
+	std::cout<<'\n';
+}
+

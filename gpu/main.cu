@@ -31,5 +31,5 @@ int main ( void ){
         std::cout<<"Reading data from file"<<std::endl;
 	SpGraph g =  read_sparse_graph("../data/test/small_test.csv","edgelist");
 	g.print_degree();
-	//g.print_graph();
+	g.print_graph();
 }
