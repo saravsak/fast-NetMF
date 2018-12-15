@@ -1,5 +1,6 @@
 #include "graph.h"
-#include "graphio.h"
+#include "io.h"
+#include "utils.h"
 
 #include<string.h>
 #include<fstream>
@@ -7,6 +8,63 @@
 #include <bits/stdc++.h> 
 #include<vector>
 
+bool check_file(const char * fileName){
+	std::ifstream infile(fileName);
+	return infile.good();
+}
+
+void write_embeddings(const char * fileName, float *embeddings, int size, int dim){
+	// Assumes embeddings are stored in column major format
+	std::ofstream op;
+	op.open(fileName);
+	op<<size<<" "<<dim<<std::endl;
+	for(int j=0;j<size;j++){
+		op << j << " ";
+		for(int i=0;i<dim;i++){
+			op << embeddings[i*size + j] << " ";	
+		}
+		op<<std::endl;
+	}
+	op.close();
+
+}
+void write_profile(const char * fileName, info profile){
+	std::ofstream op;
+	double tot = profile.iptime.count()
+			+ profile.init.count()
+			+ profile.gpuio.count()
+			+ profile.compute_d.count()
+			+ profile.compute_x.count()
+			+ profile.compute_s.count()
+			+ profile.compute_m.count()
+			+ profile.svd.count()
+			+ profile.emb.count();
+	
+	if(!check_file(fileName)){
+		std::cout<<"File does not exist. Creating file"<<std::endl;
+		op.open(fileName, std::ofstream::out);
+		op<<"dataset,algo,dimension,window size,i/p,init,gpuio,D, X, S, M,SVD, Emb, total"<<std::endl;
+	}else{
+		op.open(fileName, std::ofstream::app);
+	}
+
+
+	op<<profile.dataset<<","
+		<<profile.algo<<","
+		<<profile.dimension<<","
+		<<profile.window_size<<","
+		<<profile.iptime.count()<<","
+		<<profile.init.count()<<","
+		<<profile.gpuio.count()<<","
+		<<profile.compute_d.count()<<","
+		<<profile.compute_x.count()<<","
+		<<profile.compute_s.count()<<","
+		<<profile.compute_m.count()<<","
+		<<profile.svd.count()<<","
+		<<profile.emb.count()<<","
+		<<tot<<std::endl;	
+	op.close();
+}
 Graph read_graph(std::string filename, std::string format){
 	// TODO: Add check for unknown graph format
 

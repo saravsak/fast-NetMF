@@ -4,6 +4,7 @@
 *.ptx
 *.cubin
 *.fatbin
+.*.swp
 data/
 CPU/build
 CPU/datasets
