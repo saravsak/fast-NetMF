@@ -122,14 +122,14 @@ int main ( void ){
 	typedef std::chrono::milliseconds milliseconds;
         Clock::time_point begin, end;
 	info profile; 
-	profile.dataset = "ppi";
+	profile.dataset = "blogcatalog";
 	profile.algo = "large";
 
 	/* Load graph */
         log("Reading data from file");
 
         begin = Clock::now(); 
-	Graph g =  read_graph("../data/ppi/ppi.edgelist","edgelist");
+	Graph g =  read_graph("../data/blogcatalog/edges.csv","edgelist");
         end = Clock::now(); 
 
 	profile.iptime = std::chrono::duration_cast<milliseconds>(end - begin);	
@@ -357,7 +357,7 @@ int main ( void ){
 	end = Clock::now();
 	profile.emb = std::chrono::duration_cast<milliseconds>(end - begin);	
 
-	write_embeddings("ppi.emb",Embedding, g.size, dimension);	
+	write_embeddings("blogcatalog_large.emb",Embedding, g.size, dimension);	
 	write_profile("profile.txt", profile);		
 	log("Done");
 	/***********

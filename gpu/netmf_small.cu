@@ -85,14 +85,14 @@ int main ( void ){
 	typedef std::chrono::milliseconds milliseconds;
         Clock::time_point begin, end;
 	info profile; 
-	profile.dataset = "PPI";
+	profile.dataset = "blogcatalog";
 	profile.algo = "small";
 
 	/* Load graph */
         log("Reading data from file");
 
         begin = Clock::now(); 
-	Graph g =  read_graph("../data/ppi/ppi.edgelist","edgelist");
+	Graph g =  read_graph("../data/blogcatalog/edges.csv","edgelist");
         end = Clock::now(); 
 
 	profile.iptime = std::chrono::duration_cast<milliseconds>(end - begin);	
@@ -332,7 +332,7 @@ int main ( void ){
 
 	cudaMemcpy(W, W_device, size, cudaMemcpyDeviceToHost);
 
-	write_embeddings("ppi.emb",W, g.size, dimension);	
+	write_embeddings("blogcatalog_small.emb",W, g.size, dimension);	
 	write_profile("profile.txt", profile);		
 	log("Done");
 	/***********

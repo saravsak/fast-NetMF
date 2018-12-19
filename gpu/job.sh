@@ -9,4 +9,5 @@ set -x
 
 module load cuda
 
-./netmf_large
+./netmf_${ALGO}
+
