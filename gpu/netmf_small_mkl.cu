@@ -1,10 +1,3 @@
-/* 
-TODO: 
-1. Change thread architecture
-2. Use cuBlas for addition
-3. Async copy to device
-*/
-
 #include<stdlib.h>
 #include<iostream>
 #include<time.h>
