@@ -1,21 +1,22 @@
-/* 
-TODO: 
-1. Change thread architecture
-2. Use cuBlas for addition
-3. Async copy to device
-*/
-
 #include<stdlib.h>
 #include<iostream>
 #include<time.h>
 #include<chrono>
+#include<algorithm>
 
 #include<cuda_runtime.h>
 #include<cublas_v2.h>
 #include<cusolverDn.h>
+#include <cusparse_v2.h>
 
 #include "../utils/graph.h"
 #include "../utils/io.h"
+
+//#include<mkl.h>
+//#include<mkl_solvers_ee.h>
+//#include<mkl_spblas.h>
+//#include<mkl_feast_evcount.h>
+
 
 __global__ void compute_d(float* deg, int size){
 	int id = blockIdx.x * blockDim.x + threadIdx.x;
@@ -80,290 +81,76 @@ int main ( void ){
  	* NetMF small *
 	**************/
 
-	/* General housekeeping */
-	typedef std::chrono::high_resolution_clock Clock;
-	typedef std::chrono::milliseconds milliseconds;
-        Clock::time_point begin, end;
-	info profile; 
-	profile.dataset = "blogcatalog";
-	profile.algo = "small";
+	/* CuSparse housekeeping */
+	cusparseHandle_t cusparse_handle;    
+	cusparseCreate(&cusparse_handle);	
 
 	/* Load graph */
         log("Reading data from file");
 
-        begin = Clock::now(); 
-	Graph g =  read_graph("../data/blogcatalog/edges.csv","edgelist");
-        end = Clock::now(); 
+	Graph g =  read_graph("../data/test/small_test.csv","edgelist");
 
-	profile.iptime = std::chrono::duration_cast<milliseconds>(end - begin);	
-
-	/* CUDA housekeeping */
-	log("Running Initialization routine");
-	log("Defining Threads");
-
-	begin = Clock::now();
-	float num_threads = 128;	
-	dim3 threads(num_threads);
-	dim3 grid((int)ceil((float)g.size/num_threads));
-
-	/* cuBlas housekeeping */
-	log("Creating cuBlas variables");
-	cublasHandle_t handle;
-	cublasCreate(&handle);
-	float al=1.0f;
-	float bet=1.0f;
-
-	/* cuSolver housekeeping */
-	log("Setting up cuSolver");	
-	int lwork = 0;
-	signed char jobu = 'A';
-	signed char jobvt = 'N';
-	float *d_work, *d_rwork;
-	int *devInfo;
+	log("Printing adj matrix");
+	print_matrix(g.adj, g.size);	
 	
-	cudaMalloc(&devInfo, sizeof(int));
-	cusolverDnHandle_t cusolverH;
-	cusolverDnCreate(&cusolverH);
-	cusolverDnSgesvd_bufferSize(cusolverH,g.size, g.size,&lwork);
-	cudaMalloc(&d_work, sizeof(float) * lwork);
-	cudaMalloc(&d_rwork, sizeof(float) *( g.size - 1));
+	log("Printing degree matrix");
+	print_matrix(g.degree, g.size);	
+	/* Convert graph to sparse */	
+	// Create dense device array
 
-	/* Initialize and allocate variables */
-	log("Setting up host variables");
-	float *U, *VT, *Si, *W;
-	float *X;
-	float *S;
-	float *M;
+	log("Creating dense device array");
+	float *adj_device_dense;	
+	float *degree_device_dense; 
+
+	log("Allocating space for dense mat on device");
+	cudaMalloc(&adj_device_dense, g.size * g.size * sizeof(float)); 	
+	cudaMalloc(&degree_device_dense, g.size * g.size * sizeof(float)); 
+
+	log("Copying host to device");	
+	cudaMemcpy(adj_device_dense, g.adj, g.size * g.size * sizeof(float), cudaMemcpyHostToDevice);	
+	cudaMemcpy(degree_device_dense, g.degree, g.size * g.size * sizeof(float), cudaMemcpyHostToDevice);
+
+	log("Creating matrix descriptors");	
+	cusparseMatDescr_t adj_descr;
+	cusparseCreateMatDescr(&adj_descr);
+	cusparseSetMatType(adj_descr, CUSPARSE_MATRIX_TYPE_GENERAL);
+	cusparseSetMatIndexBase(adj_descr, CUSPARSE_INDEX_BASE_ZERO);
 	
-	int window_size = 10;
-	profile.window_size = window_size;
-	int size = g.size * g.size * sizeof(float);
-	int b = 1;
-	int dimension = 128;
-	profile.dimension = dimension;
-	//int *devInfoH;
+	log("Creating matrix descriptors");	
+	cusparseMatDescr_t degree_descr;
+	cusparseCreateMatDescr(&degree_descr);
+	cusparseSetMatType(degree_descr, CUSPARSE_MATRIX_TYPE_GENERAL);
+	cusparseSetMatIndexBase(degree_descr, CUSPARSE_INDEX_BASE_ZERO);
+
+	csr adj_csr, degree_csr;
+
+	adj_csr.nnz = 0;
+	degree_csr.nnz = 0;
+
+	adj_csr.lda = g.size;
+	degree_csr.lda = g.size;
 	
-	X = (float *)malloc(size);
-	S = (float *)malloc(size);
-	M = (float *)malloc(size);	
-	U = (float*)malloc(size);
-	VT = (float*)malloc(size);
-	W = (float*)malloc(size);
-	Si = (float*)malloc(g.size * sizeof(float));
-	//devInfoH = (int *)malloc(sizeof(int));
+	log("Computing nnzPerVector");	
+	cudaMalloc(&adj_csr.d_nnzPerVector, g.size * sizeof(float));
+	cusparseSnnz(cusparse_handle, CUSPARSE_DIRECTION_ROW, g.size, g.size, adj_descr, adj_device_dense, adj_csr.lda, adj_csr.d_nnzPerVector, &adj_csr.nnz);
 
-	log("Setting up device variables");
-	float *D_device;
-	float *temp_device;
-	float *temp1_device;
-	float *X_device;
-	float *A_device;
-	float *S_device;
-	float *M_device;
-	float *M_temp_device;
-	float *U_device, *VT_device, *Si_device;
-	float *W_device; //auxillary device array
+	cudaMalloc(&degree_csr.d_nnzPerVector, g.size * sizeof(float));
+	cusparseSnnz(cusparse_handle, CUSPARSE_DIRECTION_ROW, g.size, g.size, degree_descr, degree_device_dense, degree_csr.lda, degree_csr.d_nnzPerVector, &degree_csr.nnz);
 
-	cudaMalloc(&U_device, size);
-	cudaMalloc(&Si_device, g.size * sizeof(float));
-	cudaMalloc(&VT_device, size);
-	cudaMalloc(&W_device, size);
 
-	cudaMalloc(&D_device, size);
-	cudaMalloc(&A_device, size);
-	cudaMalloc(&X_device, size);
-	cudaMalloc(&temp_device, size);
-	cudaMalloc(&temp1_device, size);
-	cudaMalloc(&S_device, size);
-	cudaMalloc(&M_device, size);
-	cudaMalloc(&M_temp_device, size);
+	log("Computing nnzPerVector host");	
+	adj_csr.h_nnzPerVector = (int *)malloc(g.size * sizeof(int));
+	cudaMemcpy(adj_csr.h_nnzPerVector, adj_csr.d_nnzPerVector, g.size * sizeof(int), cudaMemcpyDeviceToHost);
 
-	cudaMemset(A_device, 0, size);
-	cudaMemset(D_device, 0, size);
-	cudaMemset(X_device, 0, size);
-	cudaMemset(S_device, 0, size);
-	cudaMemset(M_device, 0, size);
-	cudaMemset(M_temp_device, 0, size);
-	cudaMemset(temp_device, 0, size);
-	cudaMemset(temp1_device, 0, size);
-	end = Clock::now();
-	profile.init = std::chrono::duration_cast<milliseconds>(end - begin);
-	
-	/* Copy necessary variables to device */
-	/* 
-	   Note: Make this a non-blocking operation using
-	   using Async since g.degree, g.adj and g.size 
-	   are available at the very beginning
-	*/
-	log("Moving data to device");
-	begin = Clock::now();
-	cudaMemcpy(D_device, g.degree, size, cudaMemcpyHostToDevice);	
-	cudaMemcpy(A_device, g.adj, size , cudaMemcpyHostToDevice);	
-	end = Clock::now();
-	profile.gpuio = std::chrono::duration_cast<milliseconds>(end - begin);;
+	degree_csr.h_nnzPerVector = (int *)malloc(g.size * sizeof(int));
+	cudaMemcpy(degree_csr.h_nnzPerVector, degree_csr.d_nnzPerVector, g.size * sizeof(int), cudaMemcpyDeviceToHost);
 
-	/* Compute D = D^{-1/2} */
-	begin = Clock::now();
-	log("Computing normalized D");
-	compute_d<<<grid, threads>>>(D_device, g.size);
-	cudaDeviceSynchronize();
-	end = Clock::now();
-	profile.compute_d = std::chrono::duration_cast<milliseconds>(end - begin);;
+    	printf("Number of nonzero elements in dense adjacency matrix = %i\n\n", adj_csr.nnz);
+    	for (int i = 0; i < g.size; ++i) printf("Number of nonzero elements in row %i for matrix = %i \n", i, adj_csr.h_nnzPerVector[i]);
+    	printf("\n");
 
-	/* Compute X = D^{-1/2}AD^{-1/2} */
-	log("Computing X");
-	begin = Clock::now();
-	cublasSgemm(handle, 
-		    CUBLAS_OP_N, CUBLAS_OP_N, 
-		    g.size, g.size, g.size,
-		    &al,
-	            A_device,g.size, 
-		    D_device, g.size,
-		    &bet, 
-		    temp_device, g.size);
-	cudaDeviceSynchronize();	
-	cublasSgemm(handle, 
-		    CUBLAS_OP_N, CUBLAS_OP_N, 
-		    g.size, g.size, g.size,
-		    &al,
-		    D_device, g.size,
-	            temp_device,g.size, 
-		    &bet, 
-		    X_device, g.size);
-	cudaDeviceSynchronize();	
-	end = Clock::now();
-	profile.compute_x = std::chrono::duration_cast<milliseconds>(end - begin);;	
-	/* Compute S = sum(X^{0}....X^{window_size}) */
-	
-	cudaMemcpy(S_device, X_device, size, cudaMemcpyDeviceToDevice);
-	cudaMemcpy(temp_device, X_device, size, cudaMemcpyDeviceToDevice);
-
-	begin = Clock::now();
-	for(int i=2;i<=window_size;i++){
-		std::cout<<"Computing X^"<<i<<std::endl;
-		cublasSgemm(handle, 
-		    CUBLAS_OP_N, CUBLAS_OP_N, 
-		    g.size, g.size, g.size,
-		    &al,
-		    X_device, g.size,
-	            temp_device,g.size, 
-		    &bet, 
-		    temp1_device, g.size);
-		cudaDeviceSynchronize();		
-		
-		// Use cublas addition functions
-		compute_s<<<grid, threads>>>(S_device, temp1_device, g.size);
-		cudaDeviceSynchronize();
-		
-		cudaMemset(temp1_device,0,size);
-	}
-
-	// Compute S = S * (vol / (window_size * b))
-	transform_s<<<grid,threads>>>(S_device,g.volume, window_size, b, g.size);
-        cudaDeviceSynchronize();
-	end = Clock::now();
-	profile.compute_s = std::chrono::duration_cast<milliseconds>(end - begin);;
-	
-	// Compute M = D^{-1/2} * S * D^{-1/2}
-	cudaMemset(temp_device, 0, size); 
-	
-	begin = Clock::now();
-	log("Computing M");
-	cublasSgemm(handle, 
-	    CUBLAS_OP_N, CUBLAS_OP_N, 
-	    g.size, g.size, g.size,
-	    &al,
-	    S_device, g.size,
-	    D_device,g.size, 
-	    &bet, 
-	    temp_device, g.size);
-        cudaDeviceSynchronize();
-
-	cublasSgemm(handle, 
-	    CUBLAS_OP_N, CUBLAS_OP_N, 
-	    g.size, g.size, g.size,
-	    &al,
-	    D_device, g.size,
-	    temp_device,g.size, 
-	    &bet, 
-	    M_device, g.size);
-        cudaDeviceSynchronize();
-	
-	// Compute M = log(max(Mi,1))
-	log("Transforming M");
-	transform_m<<<grid,threads>>>(M_device, g.size);
-        cudaDeviceSynchronize();
-	
-	end = Clock::now();
-	profile.compute_m = std::chrono::duration_cast<milliseconds>(end - begin);;
-	
-	// Perform SVD on M
-	begin = Clock::now();
-	log("Performing SVD of M");
-	cusolverDnSgesvd(cusolverH, jobu, jobvt, 
-			g.size, g.size, M_device, g.size, 
-			Si_device, 
-			U_device, g.size, 
-			VT_device, g.size, 
-			d_work, 
-			lwork, 
-			d_rwork, 
-			devInfo); 
-	
-        cudaDeviceSynchronize();
-	end = Clock::now();
-	profile.svd = std::chrono::duration_cast<milliseconds>(end - begin);;	
-	
-	begin = Clock::now();
-	log("Transforming Si");
-	sqrt_si<<<grid, threads>>>(Si_device, dimension);	
-        cudaDeviceSynchronize();
-
-	log("Generating embeddings");
-	cublasSdgmm(handle, 
-	    CUBLAS_SIDE_LEFT, 
-	    g.size, dimension,
-	    U_device, g.size,
-	    Si_device,1, 
-	    W_device, g.size);
-        cudaDeviceSynchronize();
-	end = Clock::now();
-	profile.emb = std::chrono::duration_cast<milliseconds>(end - begin);;
-
-	cudaMemcpy(W, W_device, size, cudaMemcpyDeviceToHost);
-
-	write_embeddings("blogcatalog_small.emb",W, g.size, dimension);	
-	write_profile("profile.txt", profile);		
-	log("Done");
-	/***********
-	* Clean up *
-	***********/
-
-	free(X);
-	free(S);
-	free(M);
-	
-	free(U); 
-	free(VT);
-	free(Si);
-	free(W);
-
-	// DEVICE
-	cudaFree(D_device);
-	cudaFree(temp_device); 
-	cudaFree(temp1_device); 
-	cudaFree(X_device);
-	cudaFree(A_device);
-	cudaFree(S_device);
-	cudaFree(M_device);
-
-	cudaFree(U_device);
-	cudaFree(VT_device); 
-	cudaFree(Si_device);
-	cudaFree(W_device); //auxillary device array
-
-	cudaFree(d_work);
-	cudaFree(d_rwork);
-	cudaFree(devInfo);
+    	printf("Number of nonzero elements in dense degree matrix = %i\n\n", degree_csr.nnz);
+    	for (int i = 0; i < g.size; ++i) printf("Number of nonzero elements in row %i for matrix = %i \n", i, degree_csr.h_nnzPerVector[i]);
+    	printf("\n");
 
 }
