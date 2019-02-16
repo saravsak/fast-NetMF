@@ -70,12 +70,24 @@ __global__ void transform_s(double* S, int volume, int window_size, int b, int s
 	S[id] = (S[id] * float(volume))/ ((float) window_size * (float) b); 
 }
 
+__global__ void prune_m(double* M, int size){
+	int id = blockIdx.x * blockDim.x + threadIdx.x;
+
+	if(id >= size) return;
+
+	if(M[id] > 1+1e-10)
+		M[id] = M[id];
+	else
+		M[id] = 0;	
+}
+
+
 __global__ void transform_m(double* M, int size){
 	int id = blockIdx.x * blockDim.x + threadIdx.x;
 
 	if(id >= size) return;
 	
-	M[id] =logf(M[id] > 1?M[id]:1);
+	M[id] =log(M[id]);
 }
 
 __global__ void sqrt_si(float* S, int size){
@@ -791,14 +803,81 @@ int main ( void ){
 
 	log("Transforming M");
 
+	prune_m<<<grids,threads>>>(M_csr.d_values, M_csr.nnz);
+	cudaMemcpy(M_csr.h_values, M_csr.d_values, M_csr.nnz * sizeof(double), cudaMemcpyDeviceToHost);
+	for(int i=0;i<M_csr.nnz;i++) std::cout<<M_csr.h_values[i]<< " "; std::cout<<"\n";
+	cudaDeviceSynchronize();
 
 
 
+	double threshold = 1.00;
+	log("Setting threshold");
+	std::cout<<"Threshold:"<<threshold;
+	csr filtered_M;
+
+	cudaMalloc(&filtered_M.d_rowIndices, sizeof(int) * (g.size + 1));
+	size_t lworkInBytes = 0;
+	char *d_work=NULL;
+	cusparseDpruneCsr2csr_bufferSizeExt(cusparse_handle,
+        					g.size,g.size,
+        					M_csr.nnz,M_descr,
+        					M_csr.d_values,M_csr.d_rowIndices,M_csr.d_colIndices,
+        					&threshold,
+        					M_descr,
+        					filtered_M.d_values, filtered_M.d_rowIndices, filtered_M.d_colIndices,
+        					&lworkInBytes);	
+
+    	printf("lworkInBytes (prune) = %lld \n", (long long)lworkInBytes);
+	cudaMalloc((void**)&d_work, lworkInBytes);
+
+	cusparseDpruneCsr2csrNnz(cusparse_handle,
+					g.size,g.size,
+        				M_csr.nnz,M_descr,
+  					M_csr.d_values,M_csr.d_rowIndices,M_csr.d_colIndices,
+        				&threshold,
+        				M_descr,
+        				filtered_M.d_rowIndices, &filtered_M.nnz, /* host */
+        				d_work);
+
+	printf("nnzC = %d\n", filtered_M.nnz);
+    	if (0 == filtered_M.nnz ){
+        	printf("C is empty \n");
+        	return 0;
+    	}
 
 
+	cudaMalloc(&filtered_M.d_colIndices, sizeof(int) * filtered_M.nnz);
+	cudaMalloc(&filtered_M.d_values, sizeof(double) * filtered_M.nnz);
+
+	cusparseDpruneCsr2csr(cusparse_handle,
+   				g.size,g.size,
+        			M_csr.nnz, M_descr,
+        			M_csr.d_values, M_csr.d_rowIndices, M_csr.d_colIndices,
+        			&threshold,
+        			M_descr,
+        			filtered_M.d_values,filtered_M.d_rowIndices, filtered_M.d_colIndices,
+        			d_work);
 
 
+	log("Printing pruned M");
+	filtered_M.h_values = (double *) malloc(sizeof(double) * filtered_M.nnz);
+	filtered_M.h_colIndices = (int *) malloc(sizeof(int) * filtered_M.nnz);
+	filtered_M.h_rowIndices = (int *) malloc(sizeof(int) * (g.size + 1));
 
+	cudaMemcpy(filtered_M.h_values, filtered_M.d_values, sizeof(double) * filtered_M.nnz, cudaMemcpyDeviceToHost);
+	cudaMemcpy(filtered_M.h_colIndices, filtered_M.d_colIndices, sizeof(int) * filtered_M.nnz, cudaMemcpyDeviceToHost);
+	cudaMemcpy(filtered_M.h_rowIndices, filtered_M.d_rowIndices, sizeof(int) * (g.size + 1), cudaMemcpyDeviceToHost);
+	
+	for(int i=0;i<filtered_M.nnz;i++) std::cout<<filtered_M.h_values[i]<< " "; std::cout<<"\n";
+	for(int i=0;i<filtered_M.nnz;i++) std::cout<<filtered_M.h_colIndices[i]<< " "; std::cout<<"\n";
+	for(int i=0;i<g.size + 1;i++) std::cout<<filtered_M.h_rowIndices[i]<< " "; std::cout<<"\n";
+	
+	log("Printing log of M");
+	transform_m<<<grids,threads>>>(filtered_M.d_values, filtered_M.nnz);
 
+	cudaMemcpy(filtered_M.h_values, filtered_M.d_values, sizeof(double) * filtered_M.nnz, cudaMemcpyDeviceToHost);
+	for(int i=0;i<filtered_M.nnz;i++) std::cout<<filtered_M.h_values[i]<< " "; std::cout<<"\n";
+
+		
 
 }
