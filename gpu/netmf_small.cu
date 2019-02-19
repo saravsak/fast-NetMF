@@ -12,9 +12,9 @@
 #include "../utils/graph.h"
 #include "../utils/io.h"
 
-//#include<mkl.h>
-//#include<mkl_solvers_ee.h>
-//#include<mkl_spblas.h>
+#include<mkl.h>
+#include<mkl_solvers_ee.h>
+#include<mkl_spblas.h>
 //#include<mkl_feast_evcount.h>
 
 void printCsr(
@@ -117,7 +117,7 @@ int main ( void ){
 
 	/* Settings */
 	int window_size = 3;
-	int dimension = 2;
+	int dimension = 128;
 	int b = 1;
 
 	/* CuSparse housekeeping */
@@ -128,13 +128,13 @@ int main ( void ){
 	/* Load graph */
         log("Reading data from file");
 
-	Graph g =  read_graph("../data/test/small_test.csv","edgelist");
+	Graph g =  read_graph("../data/ppi/ppi.edgelist","edgelist");
 
 	log("Printing adj matrix");
-	print_matrix(g.adj, g.size);	
+	//print_matrix(g.adj, g.size);	
 	
 	log("Printing degree matrix");
-	print_matrix(g.degree, g.size);	
+	//print_matrix(g.degree, g.size);	
 	/* Convert graph to sparse */	
 	// Create dense device array
 
@@ -185,13 +185,13 @@ int main ( void ){
 	degree_csr.h_nnzPerVector = (int *)malloc(g.size * sizeof(int));
 	cudaMemcpy(degree_csr.h_nnzPerVector, degree_csr.d_nnzPerVector, g.size * sizeof(int), cudaMemcpyDeviceToHost);
 
-    	printf("Number of nonzero elements in dense adjacency matrix = %i\n\n", adj_csr.nnz);
-    	for (int i = 0; i < g.size; ++i) printf("Number of nonzero elements in row %i for matrix = %i \n", i, adj_csr.h_nnzPerVector[i]);
-    	printf("\n");
+    	//printf("Number of nonzero elements in dense adjacency matrix = %i\n\n", adj_csr.nnz);
+    	//for (int i = 0; i < g.size; ++i) printf("Number of nonzero elements in row %i for matrix = %i \n", i, adj_csr.h_nnzPerVector[i]);
+    	//printf("\n");
 
-    	printf("Number of nonzero elements in dense degree matrix = %i\n\n", degree_csr.nnz);
-    	for (int i = 0; i < g.size; ++i) printf("Number of nonzero elements in row %i for matrix = %i \n", i, degree_csr.h_nnzPerVector[i]);
-    	printf("\n");
+    	//printf("Number of nonzero elements in dense degree matrix = %i\n\n", degree_csr.nnz);
+    	//for (int i = 0; i < g.size; ++i) printf("Number of nonzero elements in row %i for matrix = %i \n", i, degree_csr.h_nnzPerVector[i]);
+    	//printf("\n");
 
 	log("Allocating host side sparse mat");
 	adj_csr.h_values = (double *)malloc(adj_csr.nnz * sizeof(double));
@@ -253,19 +253,19 @@ int main ( void ){
 		       	degree_csr.d_colIndices, 
 			degree_csr.nnz * sizeof(int), cudaMemcpyDeviceToHost);
 
-    	printf("\nOriginal adj matrix in CSR format\n\n");
-    	for (int i = 0; i < adj_csr.nnz; ++i) printf("A[%i] = %f ", i, adj_csr.h_values[i]); printf("\n");
+    	//printf("\nOriginal adj matrix in CSR format\n\n");
+    	//for (int i = 0; i < adj_csr.nnz; ++i) printf("A[%i] = %f ", i, adj_csr.h_values[i]); printf("\n");
 
-    	for (int i = 0; i < (g.size + 1); ++i) printf("RowIndices[%i] = %i \n", i, adj_csr.h_rowIndices[i]); printf("\n");
+    	//for (int i = 0; i < (g.size + 1); ++i) printf("RowIndices[%i] = %i \n", i, adj_csr.h_rowIndices[i]); printf("\n");
 
-    	for (int i = 0; i < adj_csr.nnz; ++i) printf("ColIndices[%i] = %i \n", i, adj_csr.h_colIndices[i]);  
+    	//for (int i = 0; i < adj_csr.nnz; ++i) printf("ColIndices[%i] = %i \n", i, adj_csr.h_colIndices[i]);  
 
-    	printf("\nOriginal degree matrix in CSR format\n\n");
-    	for (int i = 0; i < degree_csr.nnz; ++i) printf("A[%i] = %f ", i, degree_csr.h_values[i]); printf("\n");
+    	//printf("\nOriginal degree matrix in CSR format\n\n");
+    	//for (int i = 0; i < degree_csr.nnz; ++i) printf("A[%i] = %f ", i, degree_csr.h_values[i]); printf("\n");
 
-    	for (int i = 0; i < (g.size + 1); ++i) printf("RowIndices[%i] = %i \n", i, degree_csr.h_rowIndices[i]); printf("\n");
+    	//for (int i = 0; i < (g.size + 1); ++i) printf("RowIndices[%i] = %i \n", i, degree_csr.h_rowIndices[i]); printf("\n");
 
-    	for (int i = 0; i < degree_csr.nnz; ++i) printf("ColIndices[%i] = %i \n", i, degree_csr.h_colIndices[i]);  
+    	//for (int i = 0; i < degree_csr.nnz; ++i) printf("ColIndices[%i] = %i \n", i, degree_csr.h_colIndices[i]);  
 
 	/* CUDA housekeeping */
 	float num_threads = 128;
@@ -278,9 +278,9 @@ int main ( void ){
 	
 	log("Computed normalized D");
 	cudaMemcpy(degree_csr.h_values, degree_csr.d_values, degree_csr.nnz * sizeof(double), cudaMemcpyDeviceToHost);
-	for(int i=0;i<degree_csr.nnz;i++) std::cout<<degree_csr.h_values[i]<< " "; std::cout<<"\n";
-	for(int i=0;i<degree_csr.nnz;i++) std::cout<<degree_csr.h_colIndices[i]<< " "; std::cout<<"\n";
-	for(int i=0;i<g.size + 1;i++) std::cout<<degree_csr.h_rowIndices[i]<< " "; std::cout<<"\n";
+	//for(int i=0;i<degree_csr.nnz;i++) std::cout<<degree_csr.h_values[i]<< " "; std::cout<<"\n";
+	//for(int i=0;i<degree_csr.nnz;i++) std::cout<<degree_csr.h_colIndices[i]<< " "; std::cout<<"\n";
+	//for(int i=0;i<g.size + 1;i++) std::cout<<degree_csr.h_rowIndices[i]<< " "; std::cout<<"\n";
 
 	/* Compute X = D^{-1/2}AD^{-1/2} */
 
@@ -315,7 +315,7 @@ int main ( void ){
 		std::cout << "status = " << status << std::endl;
 		exit(0);
 	}		
-	std::cout<<"Value of NNZ: "<<*nnzTotalDevHostPtr<<std::endl;
+	//std::cout<<"Value of NNZ: "<<*nnzTotalDevHostPtr<<std::endl;
 
 	if(NULL != nnzTotalDevHostPtr){
 		X_temp_csr.nnz = *nnzTotalDevHostPtr;
@@ -344,19 +344,19 @@ int main ( void ){
 	cudaDeviceSynchronize();
 
 	cuda_status = cudaMemcpy(X_temp_csr.h_values, X_temp_csr.d_values, X_temp_csr.nnz * sizeof(double), cudaMemcpyDeviceToHost);
-	std::cout<<cuda_status;
-	std::cout<<cuda_status;
+	//std::cout<<cuda_status;
+	//std::cout<<cuda_status;
 	cuda_status = cudaMemcpy(X_temp_csr.h_rowIndices, X_temp_csr.d_rowIndices, (g.size + 1) * sizeof(int), cudaMemcpyDeviceToHost);
-	std::cout<<cuda_status;
-	std::cout<<cuda_status;
+	//std::cout<<cuda_status;
+	//std::cout<<cuda_status;
 	cuda_status = cudaMemcpy(X_temp_csr.h_colIndices, X_temp_csr.d_colIndices, X_temp_csr.nnz * sizeof(int), cudaMemcpyDeviceToHost);
 
-	std::cout<<cuda_status;
+	//std::cout<<cuda_status;
 
 	log("Print X_temp");
-	for(int i=0;i<X_temp_csr.nnz;i++) std::cout<<X_temp_csr.h_values[i]<< " "; std::cout<<"\n";
-	for(int i=0;i<X_temp_csr.nnz;i++) std::cout<<X_temp_csr.h_colIndices[i]<< " "; std::cout<<"\n";
-	for(int i=0;i<g.size + 1;i++) std::cout<<X_temp_csr.h_rowIndices[i]<< " "; std::cout<<"\n";
+//	for(int i=0;i<X_temp_csr.nnz;i++) std::cout<<X_temp_csr.h_values[i]<< " "; std::cout<<"\n";
+//	for(int i=0;i<X_temp_csr.nnz;i++) std::cout<<X_temp_csr.h_colIndices[i]<< " "; std::cout<<"\n";
+//	for(int i=0;i<g.size + 1;i++) std::cout<<X_temp_csr.h_rowIndices[i]<< " "; std::cout<<"\n";
 	
 	// Compute X = X_tempD^{-1/2} second
 	cusparseMatDescr_t X_descr;
@@ -385,7 +385,7 @@ int main ( void ){
 		std::cout << "status = " << status << std::endl;
 		exit(0);
 	}		
-	std::cout<<"Value of NNZ: "<<*nnzTotalDevHostPtr<<std::endl;
+	//std::cout<<"Value of NNZ: "<<*nnzTotalDevHostPtr<<std::endl;
 
 	if(NULL != nnzTotalDevHostPtr){
 		X_csr.nnz = *nnzTotalDevHostPtr;
@@ -396,11 +396,11 @@ int main ( void ){
 	}
 
 	cudaMalloc(&X_csr.d_colIndices, X_csr.nnz * sizeof(int));
-	cudaMalloc(&X_csr.h_rowIndices, (g.size + 1) * sizeof(int));
+	cudaMalloc(&X_csr.d_rowIndices, (g.size + 1) * sizeof(int));
 	cudaMalloc(&X_csr.d_values, X_csr.nnz * sizeof(double));
 
-	X_csr.h_colIndices = (int *) malloc(X_csr.nnz * sizeof(double));
-	X_csr.h_rowIndices = (int *) malloc(X_csr.nnz * sizeof(double));
+	X_csr.h_colIndices = (int *) malloc(X_csr.nnz * sizeof(int));
+	X_csr.h_rowIndices = (int *) malloc((g+1) * sizeof(int));
 	X_csr.h_values = (double *) malloc(X_csr.nnz * sizeof(double));
 
 	cusparseDcsrgemm(cusparse_handle, 
@@ -418,12 +418,12 @@ int main ( void ){
 	cuda_status = cudaMemcpy(X_csr.h_rowIndices, X_csr.d_rowIndices, (g.size + 1) * sizeof(int), cudaMemcpyDeviceToHost);
 	cuda_status = cudaMemcpy(X_csr.h_colIndices, X_csr.d_colIndices, X_csr.nnz * sizeof(int), cudaMemcpyDeviceToHost);
 
-	std::cout<<cuda_status;
+	//std::cout<<cuda_status;
 
 	log("Print X");
-	for(int i=0;i<X_csr.nnz;i++) std::cout<<X_csr.h_values[i]<< " "; std::cout<<"\n";
-	for(int i=0;i<X_csr.nnz;i++) std::cout<<X_csr.h_colIndices[i]<< " "; std::cout<<"\n";
-	for(int i=0;i<g.size + 1;i++) std::cout<<X_csr.h_rowIndices[i]<< " "; std::cout<<"\n";
+//	for(int i=0;i<X_csr.nnz;i++) std::cout<<X_csr.h_values[i]<< " "; std::cout<<"\n";
+//	for(int i=0;i<X_csr.nnz;i++) std::cout<<X_csr.h_colIndices[i]<< " "; std::cout<<"\n";
+//	for(int i=0;i<g.size + 1;i++) std::cout<<X_csr.h_rowIndices[i]<< " "; std::cout<<"\n";
 
 
 	 /* Compute S = sum(X^{0}....X^{window_size}) */
@@ -454,9 +454,9 @@ int main ( void ){
 	cudaMemcpy(S_csr.h_colIndices, S_csr.d_colIndices, S_csr.nnz * sizeof(int), cudaMemcpyDeviceToHost);
 	cudaMemcpy(S_csr.h_rowIndices, S_csr.d_rowIndices, (g.size + 1) * sizeof(int), cudaMemcpyDeviceToHost);
 
-	for(int i=0;i<S_csr.nnz;i++) std::cout<<S_csr.h_values[i]<< " "; std::cout<<"\n";
-	for(int i=0;i<S_csr.nnz;i++) std::cout<<S_csr.h_colIndices[i]<< " "; std::cout<<"\n";
-	for(int i=0;i<g.size + 1;i++) std::cout<<S_csr.h_rowIndices[i]<< " "; std::cout<<"\n";
+	//for(int i=0;i<S_csr.nnz;i++) std::cout<<S_csr.h_values[i]<< " "; std::cout<<"\n";
+	//for(int i=0;i<S_csr.nnz;i++) std::cout<<S_csr.h_colIndices[i]<< " "; std::cout<<"\n";
+	//for(int i=0;i<g.size + 1;i++) std::cout<<S_csr.h_rowIndices[i]<< " "; std::cout<<"\n";
 
 	log("Copying X to temp");
 	cudaMemcpy(temp_csr.d_values, X_csr.d_values, temp_csr.nnz * sizeof(double), cudaMemcpyDeviceToDevice);
@@ -472,9 +472,9 @@ int main ( void ){
 	cudaMemcpy(temp_csr.h_colIndices, temp_csr.d_colIndices, temp_csr.nnz * sizeof(int), cudaMemcpyDeviceToHost);
 	cudaMemcpy(temp_csr.h_rowIndices, temp_csr.d_rowIndices, (g.size + 1) * sizeof(int), cudaMemcpyDeviceToHost);
 
-	for(int i=0;i<temp_csr.nnz;i++) std::cout<<temp_csr.h_values[i]<< " "; std::cout<<"\n";
-	for(int i=0;i<temp_csr.nnz;i++) std::cout<<temp_csr.h_colIndices[i]<< " "; std::cout<<"\n";
-	for(int i=0;i<g.size + 1;i++) std::cout<<temp_csr.h_rowIndices[i]<< " "; std::cout<<"\n";
+	//for(int i=0;i<temp_csr.nnz;i++) std::cout<<temp_csr.h_values[i]<< " "; std::cout<<"\n";
+	//for(int i=0;i<temp_csr.nnz;i++) std::cout<<temp_csr.h_colIndices[i]<< " "; std::cout<<"\n";
+	//for(int i=0;i<g.size + 1;i++) std::cout<<temp_csr.h_rowIndices[i]<< " "; std::cout<<"\n";
 
 
 	cusparseMatDescr_t S_descr;
@@ -550,7 +550,8 @@ int main ( void ){
 		
 		}
 
-		std::cout<<"NNZ ="<<temp1_csr.nnz<<std::endl;
+		//std::cout<<"NNZ ="<<temp1_csr.nnz<<std::endl;
+
 
 		cudaMalloc(&temp1_csr.d_values, temp1_csr.nnz * sizeof(double));
 		cudaMalloc(&temp1_csr.d_colIndices, temp1_csr.nnz * sizeof(int));
@@ -574,9 +575,9 @@ int main ( void ){
 		cudaMemcpy(temp1_csr.h_colIndices, temp1_csr.d_colIndices, temp1_csr.nnz * sizeof(int), cudaMemcpyDeviceToHost);
 		cudaMemcpy(temp1_csr.h_rowIndices, temp1_csr.d_rowIndices, (g.size + 1) * sizeof(int), cudaMemcpyDeviceToHost);
 
-		for(int i=0;i<temp1_csr.nnz;i++) std::cout<<temp1_csr.h_values[i]<< " "; std::cout<<"\n";
-		for(int i=0;i<temp1_csr.nnz;i++) std::cout<<temp1_csr.h_colIndices[i]<< " "; std::cout<<"\n";
-		for(int i=0;i<g.size + 1;i++) std::cout<<temp1_csr.h_rowIndices[i]<< " "; std::cout<<"\n";
+	//	for(int i=0;i<temp1_csr.nnz;i++) std::cout<<temp1_csr.h_values[i]<< " "; std::cout<<"\n";
+	//	for(int i=0;i<temp1_csr.nnz;i++) std::cout<<temp1_csr.h_colIndices[i]<< " "; std::cout<<"\n";
+	//	for(int i=0;i<g.size + 1;i++) std::cout<<temp1_csr.h_rowIndices[i]<< " "; std::cout<<"\n";
 
 		cusparseSetPointerMode(cusparse_handle, CUSPARSE_POINTER_MODE_HOST);
 
@@ -603,10 +604,10 @@ int main ( void ){
 			S_temp_csr.nnz -= baseX;
 		}
 
-		std::cout<<"SUM-NNZ"<<S_temp_csr.nnz<<std::endl;
+		//std::cout<<"SUM-NNZ"<<S_temp_csr.nnz<<std::endl;
 
-		cudaMalloc(&S_temp_csr.d_colIndices, sizeof(int) * S_temp_csr.nnz);
 		cudaMalloc(&S_temp_csr.d_values, sizeof(double) * S_temp_csr.nnz);
+		cudaMalloc(&S_temp_csr.d_colIndices, sizeof(int) * S_temp_csr.nnz);
 
 		cusparseDcsrgeam(cusparse_handle, g.size, g.size,
 				&alf,
@@ -627,14 +628,14 @@ int main ( void ){
 		cudaMemcpy(S_temp_csr.h_rowIndices, S_temp_csr.d_rowIndices, (g.size + 1) * sizeof(int), cudaMemcpyDeviceToHost);
 		cudaMemcpy(S_temp_csr.h_colIndices, S_temp_csr.d_colIndices, S_temp_csr.nnz * sizeof(int), cudaMemcpyDeviceToHost);
 
-		for(int i=0;i<S_temp_csr.nnz;i++) std::cout<<S_temp_csr.h_values[i]<< " "; std::cout<<"\n";
-		for(int i=0;i<S_temp_csr.nnz;i++) std::cout<<S_temp_csr.h_colIndices[i]<< " "; std::cout<<"\n";
-		for(int i=0;i<g.size + 1;i++) std::cout<<S_temp_csr.h_rowIndices[i]<< " "; std::cout<<"\n";
+		//for(int i=0;i<S_temp_csr.nnz;i++) std::cout<<S_temp_csr.h_values[i]<< " "; std::cout<<"\n";
+		//for(int i=0;i<S_temp_csr.nnz;i++) std::cout<<S_temp_csr.h_colIndices[i]<< " "; std::cout<<"\n";
+		//for(int i=0;i<g.size + 1;i++) std::cout<<S_temp_csr.h_rowIndices[i]<< " "; std::cout<<"\n";
 
 		S_csr.nnz = S_temp_csr.nnz;
-		S_csr.d_values = NULL;
-		S_csr.d_rowIndices = NULL;
-		S_csr.d_colIndices = NULL;
+		cudaFree(S_csr.d_values);
+		cudaFree(S_csr.d_rowIndices);
+		//cudaFree(S_csr.d_colIndices);
 		
 		cudaMalloc(&S_csr.d_values, S_csr.nnz * sizeof(double)); 
 		cudaMalloc(&S_csr.d_rowIndices, (g.size + 1) * sizeof(int)); 
@@ -646,9 +647,9 @@ int main ( void ){
 
 
 		temp_csr.nnz = temp1_csr.nnz;
-		temp_csr.d_values = NULL;
-		temp_csr.d_rowIndices = NULL;
-		temp_csr.d_colIndices = NULL;
+		cudaFree(temp_csr.d_values);
+		cudaFree(temp_csr.d_rowIndices);
+		//cudaFree(temp_csr.d_colIndices);
 
 		cudaMalloc(&temp_csr.d_values, temp_csr.nnz * sizeof(double)); 
 		cudaMalloc(&temp_csr.d_rowIndices, (g.size + 1) * sizeof(int)); 
@@ -669,7 +670,7 @@ int main ( void ){
 	cudaMemcpy(S_csr.h_values, S_csr.d_values, S_csr.nnz * sizeof(double), cudaMemcpyDeviceToHost);
 
 	log("Transformed S values");
-	for(int i=0;i<S_csr.nnz;i++) std::cout<<S_csr.h_values[i]<< " "; std::cout<<"\n";
+	//for(int i=0;i<S_csr.nnz;i++) std::cout<<S_csr.h_values[i]<< " "; std::cout<<"\n";
 
 	log("Computing M");
 
@@ -697,7 +698,7 @@ int main ( void ){
 		std::cout << "status = " << status << std::endl;
 		exit(0);
 	}		
-	std::cout<<"Value of NNZ: "<<*nnzTotalDevHostPtr<<std::endl;
+	//std::cout<<"Value of NNZ: "<<*nnzTotalDevHostPtr<<std::endl;
 
 	if(NULL != nnzTotalDevHostPtr){
 		X_temp_csr.nnz = *nnzTotalDevHostPtr;
@@ -730,9 +731,9 @@ int main ( void ){
 	cuda_status = cudaMemcpy(X_temp_csr.h_colIndices, X_temp_csr.d_colIndices, X_temp_csr.nnz * sizeof(int), cudaMemcpyDeviceToHost);
 
 	log("Print X_temp");
-	for(int i=0;i<X_temp_csr.nnz;i++) std::cout<<X_temp_csr.h_values[i]<< " "; std::cout<<"\n";
-	for(int i=0;i<X_temp_csr.nnz;i++) std::cout<<X_temp_csr.h_colIndices[i]<< " "; std::cout<<"\n";
-	for(int i=0;i<g.size + 1;i++) std::cout<<X_temp_csr.h_rowIndices[i]<< " "; std::cout<<"\n";
+	//for(int i=0;i<X_temp_csr.nnz;i++) std::cout<<X_temp_csr.h_values[i]<< " "; std::cout<<"\n";
+	//for(int i=0;i<X_temp_csr.nnz;i++) std::cout<<X_temp_csr.h_colIndices[i]<< " "; std::cout<<"\n";
+	//for(int i=0;i<g.size + 1;i++) std::cout<<X_temp_csr.h_rowIndices[i]<< " "; std::cout<<"\n";
 	
 	// Compute M = X_temp * D^{-1/2} second
 	cusparseMatDescr_t M_descr;
@@ -761,7 +762,7 @@ int main ( void ){
 		std::cout << "status = " << status << std::endl;
 		exit(0);
 	}		
-	std::cout<<"Value of NNZ: "<<*nnzTotalDevHostPtr<<std::endl;
+	//std::cout<<"Value of NNZ: "<<*nnzTotalDevHostPtr<<std::endl;
 
 	if(NULL != nnzTotalDevHostPtr){
 		M_csr.nnz = *nnzTotalDevHostPtr;
@@ -794,25 +795,27 @@ int main ( void ){
 	cuda_status = cudaMemcpy(M_csr.h_rowIndices, M_csr.d_rowIndices, (g.size + 1) * sizeof(int), cudaMemcpyDeviceToHost);
 	cuda_status = cudaMemcpy(M_csr.h_colIndices, M_csr.d_colIndices, M_csr.nnz * sizeof(int), cudaMemcpyDeviceToHost);
 
-	std::cout<<cuda_status;
+	//std::cout<<cuda_status;
 
 	log("Print M");
-	for(int i=0;i<M_csr.nnz;i++) std::cout<<M_csr.h_values[i]<< " "; std::cout<<"\n";
-	for(int i=0;i<M_csr.nnz;i++) std::cout<<M_csr.h_colIndices[i]<< " "; std::cout<<"\n";
-	for(int i=0;i<g.size + 1;i++) std::cout<<M_csr.h_rowIndices[i]<< " "; std::cout<<"\n";
+	//for(int i=0;i<M_csr.nnz;i++) std::cout<<M_csr.h_values[i]<< " "; std::cout<<"\n";
+	//for(int i=0;i<M_csr.nnz;i++) std::cout<<M_csr.h_colIndices[i]<< " "; std::cout<<"\n";
+	//for(int i=0;i<g.size + 1;i++) std::cout<<M_csr.h_rowIndices[i]<< " "; std::cout<<"\n";
 
 	log("Transforming M");
 
 	prune_m<<<grids,threads>>>(M_csr.d_values, M_csr.nnz);
 	cudaMemcpy(M_csr.h_values, M_csr.d_values, M_csr.nnz * sizeof(double), cudaMemcpyDeviceToHost);
-	for(int i=0;i<M_csr.nnz;i++) std::cout<<M_csr.h_values[i]<< " "; std::cout<<"\n";
+	cudaMemcpy(M_csr.h_rowIndices, M_csr.d_rowIndices, (g.size + 1) * sizeof(int), cudaMemcpyDeviceToHost);
+	cudaMemcpy(M_csr.h_colIndices, M_csr.d_colIndices, M_csr.nnz * sizeof(int), cudaMemcpyDeviceToHost);
+	//for(int i=0;i<M_csr.nnz;i++) std::cout<<M_csr.h_values[i]<< " "; std::cout<<"\n";
 	cudaDeviceSynchronize();
 
 
 
 	double threshold = 1.00;
 	log("Setting threshold");
-	std::cout<<"Threshold:"<<threshold;
+	//std::cout<<"Threshold:"<<threshold;
 	csr filtered_M;
 
 	cudaMalloc(&filtered_M.d_rowIndices, sizeof(int) * (g.size + 1));
@@ -827,7 +830,7 @@ int main ( void ){
         					filtered_M.d_values, filtered_M.d_rowIndices, filtered_M.d_colIndices,
         					&lworkInBytes);	
 
-    	printf("lworkInBytes (prune) = %lld \n", (long long)lworkInBytes);
+    	//printf("lworkInBytes (prune) = %lld \n", (long long)lworkInBytes);
 	cudaMalloc((void**)&d_work, lworkInBytes);
 
 	cusparseDpruneCsr2csrNnz(cusparse_handle,
@@ -839,7 +842,7 @@ int main ( void ){
         				filtered_M.d_rowIndices, &filtered_M.nnz, /* host */
         				d_work);
 
-	printf("nnzC = %d\n", filtered_M.nnz);
+	//printf("nnzC = %d\n", filtered_M.nnz);
     	if (0 == filtered_M.nnz ){
         	printf("C is empty \n");
         	return 0;
@@ -868,16 +871,89 @@ int main ( void ){
 	cudaMemcpy(filtered_M.h_colIndices, filtered_M.d_colIndices, sizeof(int) * filtered_M.nnz, cudaMemcpyDeviceToHost);
 	cudaMemcpy(filtered_M.h_rowIndices, filtered_M.d_rowIndices, sizeof(int) * (g.size + 1), cudaMemcpyDeviceToHost);
 	
-	for(int i=0;i<filtered_M.nnz;i++) std::cout<<filtered_M.h_values[i]<< " "; std::cout<<"\n";
-	for(int i=0;i<filtered_M.nnz;i++) std::cout<<filtered_M.h_colIndices[i]<< " "; std::cout<<"\n";
-	for(int i=0;i<g.size + 1;i++) std::cout<<filtered_M.h_rowIndices[i]<< " "; std::cout<<"\n";
+	//for(int i=0;i<filtered_M.nnz;i++) std::cout<<filtered_M.h_values[i]<< " "; std::cout<<"\n";
+	//for(int i=0;i<filtered_M.nnz;i++) std::cout<<filtered_M.h_colIndices[i]<< " "; std::cout<<"\n";
+	//for(int i=0;i<g.size + 1;i++) std::cout<<filtered_M.h_rowIndices[i]<< " "; std::cout<<"\n";
 	
 	log("Printing log of M");
 	transform_m<<<grids,threads>>>(filtered_M.d_values, filtered_M.nnz);
 
 	cudaMemcpy(filtered_M.h_values, filtered_M.d_values, sizeof(double) * filtered_M.nnz, cudaMemcpyDeviceToHost);
-	for(int i=0;i<filtered_M.nnz;i++) std::cout<<filtered_M.h_values[i]<< " "; std::cout<<"\n";
+	cudaMemcpy(filtered_M.h_colIndices, filtered_M.d_colIndices, sizeof(int) * filtered_M.nnz, cudaMemcpyDeviceToHost);
+	cudaMemcpy(filtered_M.h_rowIndices, filtered_M.d_rowIndices, sizeof(int) * (g.size + 1), cudaMemcpyDeviceToHost);
+	//for(int i=0;i<filtered_M.nnz;i++) std::cout<<filtered_M.h_values[i]<< " "; std::cout<<"\n";
 
-		
+	char whichS = 'L';
+	char whichV = 'L';
+
+	MKL_INT pm[128];
+	mkl_sparse_ee_init(pm);
+	//pm[1] = 100;
+	//pm[2] = 2;
+	//pm[4] = 60;
+
+	MKL_INT mkl_rows = g.size;
+	MKL_INT mkl_cols = g.size;
+
+
+	MKL_INT rows_start[mkl_rows];
+	MKL_INT rows_end[mkl_rows];
+
+	for(int i=0;i<mkl_rows;i++){
+		rows_start[i] = filtered_M.h_rowIndices[i];
+		rows_end[i] = filtered_M.h_colIndices[i];
+	}
+
+	
+	MKL_INT mkl_col_idx[filtered_M.nnz];
+	for(int i=0;i<filtered_M.nnz;i++)
+		mkl_col_idx[i] = filtered_M.h_colIndices[i];
+
+
+	sparse_matrix_t M_mkl;
+	sparse_index_base_t indexing = SPARSE_INDEX_BASE_ZERO;
+
+	mkl_sparse_d_create_csr(&M_mkl, indexing,
+					mkl_rows, mkl_cols,
+					rows_start, rows_end,
+					mkl_col_idx, filtered_M.h_values);
+
+	log("Created MKL sparse");
+
+	matrix_descr mkl_descrM;
+	mkl_descrM.type = SPARSE_MATRIX_TYPE_GENERAL;	
+	mkl_descrM.mode = SPARSE_FILL_MODE_UPPER;
+	mkl_descrM.diag = SPARSE_DIAG_NON_UNIT;
+
+	MKL_INT k0 = dimension;
+	MKL_INT k;
+
+	double *E_mkl, *K_L_mkl, *K_R_mkl, *res_mkl;
+
+	E_mkl = (double *)mkl_malloc(k0 * sizeof(double), 128);
+	K_L_mkl = (double *)mkl_malloc( k0*mkl_rows*sizeof( double), 128 );
+        K_R_mkl = (double *)mkl_malloc( k0*mkl_cols*sizeof( double), 128 );
+        res_mkl = (double *)mkl_malloc( k0*sizeof( double), 128 );
+
+	memset(E_mkl, 0 , k0);
+	memset(K_L_mkl, 0 , k0);
+	memset(K_R_mkl, 0 , k0);
+	memset(res_mkl, 0 , k0);
+
+	int mkl_status = 0;
+
+	log("Computing SVD via MKL");
+	mkl_status = mkl_sparse_d_svd(&whichS, &whichV, pm,
+			M_mkl, mkl_descrM,
+			k0, &k,
+			E_mkl,
+			K_L_mkl,
+			K_R_mkl,
+			res_mkl);
+	log("Computed SVD via MKL");
+
+	std::cout<<"Number of eigenvalues found: "<<k<<std::endl;
+	for(int i=0;i<k0;i++){ std::cout<<E_mkl[i]<<" ";} std::cout<<"\n";
+
 
 }
