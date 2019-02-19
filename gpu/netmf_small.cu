@@ -17,17 +17,16 @@
 #include<mkl_spblas.h>
 //#include<mkl_feast_evcount.h>
 
-#define DEBUG false
+#define DEBUG true
+
 
 void print_csr(
     int m,
-    int n,
     int nnz,
-    const cusparseMatDescr_t descrA,
     csr mat_csr,
     const char* name)
 {
-    printf("matrix %s is %d-by-%d, nnz=%d\n", name, m, n, nnz);
+    printf("matrix %s is %d-by-%d, nnz=%d\n", name, m, m, nnz);
     std::cout<<"Values: "; for(int i=0;i<nnz;i++) std::cout<<mat_csr.h_values[i]<<" "; std::cout<<'\n';
     std::cout<<"Cols: "; for(int i=0;i<nnz;i++) std::cout<<mat_csr.h_colIndices[i]<<" "; std::cout<<'\n';
     std::cout<<"Rows: "; for(int i=0;i<m+1;i++) std::cout<<mat_csr.h_rowIndices[i]<<" "; std::cout<<'\n';
@@ -102,12 +101,12 @@ void print_matrix(double* S, int size){
 }
 
 
-void allocate_csr_row(csr *csr_mat, int nnz, int num_rows){
+void allocate_csr_row(csr *csr_mat, int num_rows){
 	csr_mat->h_rowIndices = (int *) malloc((num_rows+1) * sizeof(int));
 	cudaMalloc(&csr_mat->d_rowIndices, (num_rows+1) * sizeof(int));
 
 }
-void allocate_csr_col_val(csr *csr_mat, int nnz, int num_rows){
+void allocate_csr_col_val(csr *csr_mat, int nnz){
 	csr_mat->h_values = (double *) malloc(nnz * sizeof(double));
 	csr_mat->h_colIndices = (int *) malloc(nnz * sizeof(int));
 
@@ -146,12 +145,67 @@ void host2device(csr *csr_mat, int nnz, int num_rows){
 			(num_rows + 1) * sizeof(int), cudaMemcpyHostToDevice);
 }
 
+void multiply_csr(csr *A, csr *B, csr *C, int m, int n, int k, cusparseHandle_t context,cusparseMatDescr_t descr ){
+
+	cusparseStatus_t status;
+
+	int base;
+	int *nnzTotalDevHostPtr;
+	C->nnz = 0;
+	nnzTotalDevHostPtr = &C->nnz;
+
+	cusparseSetPointerMode(context, CUSPARSE_POINTER_MODE_HOST);
+
+	allocate_csr_row(C, m);
+	cudaMalloc(&C->d_rowIndices, (m+1) * sizeof(int));
+	
+	status = cusparseXcsrgemmNnz(context, 
+                      CUSPARSE_OPERATION_NON_TRANSPOSE, CUSPARSE_OPERATION_NON_TRANSPOSE,
+                      m, n, k,
+                      descr, A->nnz,
+                      A->d_rowIndices, A->d_colIndices, 
+                      descr, B->nnz,
+                      B->d_rowIndices, B->d_colIndices,
+                      descr, C->d_rowIndices,
+                      nnzTotalDevHostPtr
+                      );
+
+	if(status!=CUSPARSE_STATUS_SUCCESS){
+		std::cout<<"Error occured in finding NNZ";
+		std::cout<<"\n Status "<<status;
+		exit(0);
+	}
+
+	if(NULL != nnzTotalDevHostPtr){
+		C->nnz = *nnzTotalDevHostPtr;
+	}else{
+		cudaMemcpy(&C->nnz, C->d_rowIndices + m, sizeof(int), cudaMemcpyDeviceToHost);
+		cudaMemcpy(&base, C->d_rowIndices, sizeof(int), cudaMemcpyDeviceToHost);
+		C->nnz -= base;
+	}
+
+	allocate_csr_col_val(C, C->nnz);	
+
+	cusparseDcsrgemm(context, 
+			CUSPARSE_OPERATION_NON_TRANSPOSE, CUSPARSE_OPERATION_NON_TRANSPOSE,
+			m,n,k,
+			descr, A->nnz,
+			A->d_values, A->d_rowIndices, A->d_colIndices,
+			descr, B->nnz,
+			B->d_values, B->d_rowIndices, B->d_colIndices,
+			descr, 
+			C->d_values, C->d_rowIndices, C->d_colIndices);
+
+	cudaDeviceSynchronize();
+}
 
 
 int main ( void ){
 	/**************
  	* NetMF small *
 	**************/
+
+	/* Section 0: Preliminaries */
 
 	/* Settings */
 	int window_size = 3;
@@ -170,6 +224,11 @@ int main ( void ){
 	log("Printing degree matrix");
 	if(DEBUG)
 		print_matrix(g.degree, g.size);
+
+	/* CUDA housekeeping */
+	float num_threads = 128;
+	dim3 threads(num_threads);
+	dim3 grids((int)ceil((float)g.size/num_threads));
 
 	/* CuSparse housekeeping */
 	cusparseHandle_t cusparse_handle;    
@@ -284,9 +343,7 @@ int main ( void ){
 	if(DEBUG){
 		print_csr(
     			g.size,
-    			g.size,
     			adj_csr.nnz,
-    			mat_descr,
     			adj_csr,
     			"Adjacency matrix");
 	}
@@ -304,120 +361,46 @@ int main ( void ){
 	if(DEBUG){
 		print_csr(
     			g.size,
-    			g.size,
     			degree_csr.nnz,
-    			mat_descr,
     			degree_csr,
     			"Degree matrix");
 	}
 
 	log("Completed conversion of data from dense to sparse");
-//
-//
-//    	//printf("\nOriginal adj matrix in CSR format\n\n");
-//    	//for (int i = 0; i < adj_csr.nnz; ++i) printf("A[%i] = %f ", i, adj_csr.h_values[i]); printf("\n");
-//
-//    	//for (int i = 0; i < (g.size + 1); ++i) printf("RowIndices[%i] = %i \n", i, adj_csr.h_rowIndices[i]); printf("\n");
-//
-//    	//for (int i = 0; i < adj_csr.nnz; ++i) printf("ColIndices[%i] = %i \n", i, adj_csr.h_colIndices[i]);  
-//
-//    	//printf("\nOriginal degree matrix in CSR format\n\n");
-//    	//for (int i = 0; i < degree_csr.nnz; ++i) printf("A[%i] = %f ", i, degree_csr.h_values[i]); printf("\n");
-//
-//    	//for (int i = 0; i < (g.size + 1); ++i) printf("RowIndices[%i] = %i \n", i, degree_csr.h_rowIndices[i]); printf("\n");
-//
-//    	//for (int i = 0; i < degree_csr.nnz; ++i) printf("ColIndices[%i] = %i \n", i, degree_csr.h_colIndices[i]);  
-//
-//	/* CUDA housekeeping */
-//	float num_threads = 128;
-//	dim3 threads(num_threads);
-//	dim3 grids((int)ceil((float)g.size/num_threads));
-//	
-//	/* Compute D = D^{-1/2} */
-//	log("Computing normalized D");
-//	compute_d<<<grids, threads>>>(degree_csr.d_values, degree_csr.nnz);
-//	
-//	log("Computed normalized D");
-//	cudaMemcpy(degree_csr.h_values, degree_csr.d_values, degree_csr.nnz * sizeof(double), cudaMemcpyDeviceToHost);
-//	//for(int i=0;i<degree_csr.nnz;i++) std::cout<<degree_csr.h_values[i]<< " "; std::cout<<"\n";
-//	//for(int i=0;i<degree_csr.nnz;i++) std::cout<<degree_csr.h_colIndices[i]<< " "; std::cout<<"\n";
-//	//for(int i=0;i<g.size + 1;i++) std::cout<<degree_csr.h_rowIndices[i]<< " "; std::cout<<"\n";
-//
-//	/* Compute X = D^{-1/2}AD^{-1/2} */
-//
-//	// Compute X_temp = D^{-1/2}A first	
-//	cusparseMatDescr_t X_temp_descr;
-//	cusparseCreateMatDescr(&X_temp_descr);
-//	cusparseSetMatType(X_temp_descr, CUSPARSE_MATRIX_TYPE_GENERAL);
-//	cusparseSetMatIndexBase(X_temp_descr, CUSPARSE_INDEX_BASE_ZERO);
-//
-//	csr X_temp_csr;
-//	int baseX;
-//       	X_temp_csr.nnz = 0;
-//	int *nnzTotalDevHostPtr = &X_temp_csr.nnz;
-//
-//	cusparseStatus_t status;	
-//	cudaError_t cuda_status;
-//
-//	cusparseSetPointerMode(cusparse_handle, CUSPARSE_POINTER_MODE_HOST);
-//	cudaMalloc(&X_temp_csr.d_rowIndices, (g.size + 1) * sizeof(int));
-//	status = cusparseXcsrgemmNnz(cusparse_handle, 
-//				CUSPARSE_OPERATION_NON_TRANSPOSE, CUSPARSE_OPERATION_NON_TRANSPOSE,
-//				g.size, g.size, g.size,
-//				degree_descr, degree_csr.nnz,
-//				degree_csr.d_rowIndices, degree_csr.d_colIndices, 
-//				adj_descr, adj_csr.nnz,
-//				adj_csr.d_rowIndices, adj_csr.d_colIndices,
-//				X_temp_descr, X_temp_csr.d_rowIndices,
-//				nnzTotalDevHostPtr
-//				);
-//	if (status != CUSPARSE_STATUS_SUCCESS) {
-//		std::cout << "nnz calculation failed" << std::endl;
-//		std::cout << "status = " << status << std::endl;
-//		exit(0);
-//	}		
-//	//std::cout<<"Value of NNZ: "<<*nnzTotalDevHostPtr<<std::endl;
-//
-//	if(NULL != nnzTotalDevHostPtr){
-//		X_temp_csr.nnz = *nnzTotalDevHostPtr;
-//	}else{
-//		cudaMemcpy(&X_temp_csr.nnz, X_temp_csr.d_rowIndices + g.size, sizeof(int), cudaMemcpyDeviceToHost);
-//		cudaMemcpy(&baseX, X_temp_csr.d_rowIndices, sizeof(int), cudaMemcpyDeviceToHost);
-//		X_temp_csr.nnz -= baseX;
-//	}
-//
-//	cudaMalloc(&X_temp_csr.d_colIndices, X_temp_csr.nnz * sizeof(int));
-//	cudaMalloc(&X_temp_csr.d_values, X_temp_csr.nnz * sizeof(double));
-//
-//	X_temp_csr.h_colIndices = (int *) malloc(X_temp_csr.nnz * sizeof(double));
-//	X_temp_csr.h_rowIndices = (int *) malloc((g.size + 1) * sizeof(double));
-//	X_temp_csr.h_values = (double *) malloc(X_temp_csr.nnz * sizeof(double));
-//
-//	cusparseDcsrgemm(cusparse_handle, 
-//			CUSPARSE_OPERATION_NON_TRANSPOSE, CUSPARSE_OPERATION_NON_TRANSPOSE,
-//			g.size, g.size, g.size,
-//			degree_descr, degree_csr.nnz,
-//			degree_csr.d_values, degree_csr.d_rowIndices, degree_csr.d_colIndices,
-//			adj_descr, adj_csr.nnz,
-//			adj_csr.d_values, adj_csr.d_rowIndices, adj_csr.d_colIndices,
-//			X_temp_descr, 
-//			X_temp_csr.d_values, X_temp_csr.d_rowIndices, X_temp_csr.d_colIndices);
-//	cudaDeviceSynchronize();
-//
-//	cuda_status = cudaMemcpy(X_temp_csr.h_values, X_temp_csr.d_values, X_temp_csr.nnz * sizeof(double), cudaMemcpyDeviceToHost);
-//	//std::cout<<cuda_status;
-//	//std::cout<<cuda_status;
-//	cuda_status = cudaMemcpy(X_temp_csr.h_rowIndices, X_temp_csr.d_rowIndices, (g.size + 1) * sizeof(int), cudaMemcpyDeviceToHost);
-//	//std::cout<<cuda_status;
-//	//std::cout<<cuda_status;
-//	cuda_status = cudaMemcpy(X_temp_csr.h_colIndices, X_temp_csr.d_colIndices, X_temp_csr.nnz * sizeof(int), cudaMemcpyDeviceToHost);
-//
-//	//std::cout<<cuda_status;
-//
-//	log("Print X_temp");
-////	for(int i=0;i<X_temp_csr.nnz;i++) std::cout<<X_temp_csr.h_values[i]<< " "; std::cout<<"\n";
-////	for(int i=0;i<X_temp_csr.nnz;i++) std::cout<<X_temp_csr.h_colIndices[i]<< " "; std::cout<<"\n";
-////	for(int i=0;i<g.size + 1;i++) std::cout<<X_temp_csr.h_rowIndices[i]<< " "; std::cout<<"\n";
+
+	/* Section 2: Compute X = D^{-1/2} * A * D^{-1/2} */
+	/* Procedure
+	   1. Compute D' = D^{-1/2}
+	   2. Compute X' = D' * A
+	   3. Compute X = X' * D'
+	*/
+	
+	/* Step 1: Compute D' = D^{-1/2} */
+	log("Computing normalized D");
+	compute_d<<<grids, threads>>>(degree_csr.d_values, degree_csr.nnz);
+	
+	log("Computed normalized D");
+	if(DEBUG){
+		device2host(&degree_csr, degree_csr.nnz, g.size);
+		print_csr(
+			g.size,
+			degree_csr.nnz,
+			degree_csr,
+			"Normalized Degree Matrix");
+	}
+			
+
+	/* Step 2: Compute X' = D' * A */
+	csr X_temp;
+	multiply_csr(&adj_csr, &degree_csr, &X_temp, g.size, g.size, g.size, cusparse_handle, mat_descr);
+	
+	if(DEBUG){
+		device2host(&X_temp, X_temp.nnz, g.size);
+		print_csr(g.size, X_temp.nnz, X_temp, "X' = D' * A");
+	}
+	
+
+
 //	
 //	// Compute X = X_tempD^{-1/2} second
 //	cusparseMatDescr_t X_descr;
