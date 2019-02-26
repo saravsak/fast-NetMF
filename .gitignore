@@ -6,4 +6,4 @@
 *.fatbin
 .*.swp
 data/
-lib/
+lib/*

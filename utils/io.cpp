@@ -13,7 +13,7 @@ bool check_file(const char * fileName){
 	return infile.good();
 }
 
-void write_embeddings(const char * fileName, float *embeddings, int size, int dim){
+void write_embeddings(const char * fileName, double *embeddings, int size, int dim){
 	// Assumes embeddings are stored in column major format
 	std::ofstream op;
 	op.open(fileName);
@@ -118,10 +118,12 @@ Graph read_graph_from_edgelist(std::string filename){
 
 		// If node does not exist in map, add it
 		if(node_mapping.find(nodes[0]) == node_mapping.end()){
-			node_mapping.insert( std::pair<std::string, int>( nodes[0], node_num++  ));
+			node_mapping.insert( std::pair<std::string, int>( nodes[0], node_num  ));
+			node_num++;
 		}
 		if(node_mapping.find(nodes[1]) == node_mapping.end()){
-			node_mapping.insert( std::pair<std::string, int>( nodes[1], node_num++  ));
+			node_mapping.insert( std::pair<std::string, int>( nodes[1], node_num  ));
+			node_num++;
 		}
 
 		
@@ -144,13 +146,22 @@ Graph read_graph_from_edgelist(std::string filename){
 
 	std::map<int, std::vector<int>>::iterator it;
         Graph G(node_mapping.size());	
-	
+
+
+
 	for(it = adj_list.begin(); it != adj_list.end(); it++){
 		source = it->first;
 		for(std::vector<int>::iterator nit = it->second.begin(); nit!= it->second.end(); ++nit){
 			G.add_edge(source, *nit, 1.0);
 		}
 	} 
+	
+	std::map<std::string, int>::iterator new_it;
+	std::ofstream mapfile("mapping.txt");	
+	for(new_it = node_mapping.begin(); new_it != node_mapping.end(); new_it++){
+		mapfile<< new_it->first << ":" << new_it->second <<std::endl;
+	}	
+	mapfile.close();
 
 	return G;
 }
