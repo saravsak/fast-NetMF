@@ -315,7 +315,7 @@ int main ( void ){
         log("Reading data from file");
 	
 	//Graph g =  read_graph("../data/test/small_test.csv","edgelist");
-	Graph g =  read_graph("../data/ppi/ppi.edgelist","edgelist");
+	Graph g =  read_graph("../data/blogcatalog/edges.csv","edgelist");
 	
 	if(DEBUG){
 		if(VERBOSE){
@@ -970,5 +970,5 @@ int main ( void ){
 //		}
 //		std::cout<<"\n";
 //	}
-	write_embeddings("ppi.emb",E_host, g.size, dimension);
+	write_embeddings("blogcatalog.emb",E_host, g.size, dimension);
 }
