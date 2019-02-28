@@ -11,7 +11,7 @@
 class Graph
 {
 	public:
-		double *adj, *degree, volume;
+		double *adj, *degree, *degree1D, volume;
 		int size;
 		float num_edges;
 		bool directed;

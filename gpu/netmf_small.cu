@@ -18,7 +18,7 @@
 #include<mkl_solvers_ee.h>
 #include<mkl_spblas.h>
 
-#define DEBUG true
+#define DEBUG false
 #define VERBOSE false
 
 
@@ -307,7 +307,7 @@ int main ( void ){
 	/* Section 0: Preliminaries */
 
 	/* Settings */
-	int window_size = 3;
+	int window_size = 3;//10;
 	int dimension = 128;
 	int b = 1;
 
@@ -315,7 +315,8 @@ int main ( void ){
         log("Reading data from file");
 	
 	//Graph g =  read_graph("../data/test/small_test.csv","edgelist");
-	Graph g =  read_graph("../data/blogcatalog/edges.csv","edgelist");
+	Graph g =  read_graph("../data/ppi/ppi.edgelist","edgelist");
+	//Graph g =  read_graph("../data/blogcatalog/edges.csv","edgelist");
 	
 	if(DEBUG){
 		if(VERBOSE){
@@ -455,8 +456,8 @@ int main ( void ){
 			LDA, 
 			adj_csr.d_nnzPerVector, 
 			adj_csr.d_values, adj_csr.d_rowIndices, adj_csr.d_colIndices); 
-	device2host(&adj_csr, adj_csr.nnz, g.size);	
 	if(VERBOSE){
+		device2host(&adj_csr, adj_csr.nnz, g.size);	
 		print_csr(
     			g.size,
     			adj_csr.nnz,
@@ -475,7 +476,6 @@ int main ( void ){
 
 	if(DEBUG){
 		device2host(&degree_csr, degree_csr.nnz, g.size);	
-		std::sort(degree_csr.h_values, degree_csr.h_values + degree_csr.nnz);
 		double sum = 0;
 		for(int i=0;i<degree_csr.nnz;i++)
 			sum+=degree_csr.h_values[i];
@@ -506,6 +506,13 @@ int main ( void ){
 	log("Computed normalized D");
 	if(DEBUG){
 		device2host(&degree_csr, degree_csr.nnz, g.size);
+		int sum = 0;
+
+		for(int i=0;i<degree_csr.nnz;i++)
+			sum+=degree_csr.h_values[i];
+
+		std::cout<<"Sum of normalized degree matrix"<<sum<<std::endl;
+
 		std::sort(degree_csr.h_values, degree_csr.h_values + degree_csr.nnz);
 		if(VERBOSE){
 			print_csr(
@@ -856,8 +863,14 @@ int main ( void ){
 	MKL_INT mkl_cols = g.size;
 
 
-	MKL_INT rows_start[mkl_rows];
-	MKL_INT rows_end[mkl_rows];
+	//MKL_INT rows_start[mkl_rows];
+	//MKL_INT rows_end[mkl_rows];
+
+	MKL_INT *rows_start;
+	MKL_INT *rows_end;
+
+	rows_start = (MKL_INT *)mkl_malloc(mkl_rows * sizeof(MKL_INT),64);
+	rows_end = (MKL_INT *)mkl_malloc(mkl_rows * sizeof(MKL_INT),64);
 
 	for(int i=0;i<mkl_rows;i++){
 		rows_start[i] = M_cap.h_rowIndices[i];
@@ -865,9 +878,16 @@ int main ( void ){
 	}
 
 	
-	MKL_INT mkl_col_idx[M_cap.nnz];
-	for(int i=0;i<M_cap.nnz;i++)
-		mkl_col_idx[i] = M_cap.h_colIndices[i];
+	//MKL_INT mkl_col_idx[M_cap.nnz];
+
+	MKL_INT *mkl_col_idx;
+	mkl_col_idx = (MKL_INT*)mkl_malloc(M_cap.nnz * sizeof(MKL_INT), 64);
+
+	int mkl_temp;
+	for(int i=0;i<M_cap.nnz;i++){
+		mkl_temp = M_cap.h_colIndices[i];
+		mkl_col_idx[i] = mkl_temp;
+	}
 
 
 	sparse_matrix_t M_mkl;
@@ -912,11 +932,14 @@ int main ( void ){
 			res_mkl);
 	log("Computed SVD via MKL");
 
+	if(DEBUG){
 	std::cout<<"Number of singular found: "<<k<<std::endl;
 	for(int i=0;i<k0;i++){ std::cout<<E_mkl[i]<<" ";} std::cout<<"\n";
+	}
 
 	double *U_device, *Si_device;
-	double *U_host, *Si_host;
+	double *U_host;
+	double *Si_host;
 	double *E_device, *E_host;
 
 	cudaMalloc(&U_device, g.size * dimension * sizeof(double));
@@ -927,33 +950,12 @@ int main ( void ){
 	E_host = (double *) malloc(g.size * dimension * sizeof(double));
 	Si_host = (double *) malloc(dimension * sizeof(double));
 
-	// Convert to column major order
-	//U_host = (double *) malloc(g.size * dimension * sizeof(double));
-	//for(int i=0;i<g.size;i++){
-	//	for(int j=0;j<dimension;j++){
-	//		U_host[j*g.size+i] = K_L_mkl[i*g.size + j];
-	//	}
-	//}
-
 	cudaMemcpy(U_device, K_L_mkl, g.size * dimension * sizeof(double), cudaMemcpyHostToDevice);
 	cudaMemcpy(Si_device, E_mkl, dimension * sizeof(double), cudaMemcpyHostToDevice);
 
 	transform_si<<<grids,threads>>>(Si_device, dimension);
 
 	cudaMemcpy(Si_host, Si_device, dimension * sizeof(double), cudaMemcpyDeviceToHost);
-
-//	for(int i=0;i<dimension;i++){
-//		std::cout<<Si_host[i]<<" ";	
-//	}
-
-//	std::cout<<"\nSing vect"<<std::endl;
-//	for(int j=0;j<g.size;j++){
-//		for(int i=0;i<dimension;i++){
-//			std::cout<<K_L_mkl[i*dimension + j]<<" ";
-//		}
-//		std::cout<<"\n";
-//	}
-	
 
 	std::cout<<"\n";
 	cublasDdgmm(cublas_handle, CUBLAS_SIDE_RIGHT,
@@ -964,11 +966,10 @@ int main ( void ){
 
 	cudaMemcpy(E_host, E_device, g.size * dimension * sizeof(double), cudaMemcpyDeviceToHost);
 
-//	for(int i=0;i<g.size;i++){
-//		for(int j=0;j<dimension;j++){
-//			std::cout<<E_host[j*g.size + i]<<" ";
-//		}
-//		std::cout<<"\n";
-//	}
 	write_embeddings("blogcatalog.emb",E_host, g.size, dimension);
+
+	mkl_free(rows_start);	
+	mkl_free(rows_end);	
+	mkl_free(mkl_col_idx);	
+
 }
