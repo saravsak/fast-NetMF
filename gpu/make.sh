@@ -14,3 +14,5 @@ nvcc -o ../utils/utils.o -c ../utils/utils.cpp
 nvcc -g -O3 -o netmf_small_sparse_hybrid netmf_small_sparse_hybrid.cu $FLAGS
 nvcc -g -O3 -o netmf_small_dense_hybrid netmf_small_dense_hybrid.cu $FLAGS
 
+nvcc -g -O3 -o netmf netmf.cu $FLAGS
+
