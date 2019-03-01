@@ -65,7 +65,7 @@ void write_profile(const char * fileName, info profile){
 		<<tot<<std::endl;	
 	op.close();
 }
-Graph read_graph(std::string filename, std::string format){
+Graph read_graph(std::string filename, std::string format, const char *mapping_filename){
 	// TODO: Add check for unknown graph format
 
 	if(!format.compare("metis"))
@@ -75,7 +75,7 @@ Graph read_graph(std::string filename, std::string format){
 		return read_graph_from_mat(filename);
 
 	if(!format.compare("edgelist"))
-		return read_graph_from_edgelist(filename);
+		return read_graph_from_edgelist(filename, mapping_filename);
 }
 
 Graph read_graph_from_metis(std::string filename){
@@ -90,7 +90,7 @@ Graph read_graph_from_mat(std::string filename){
 	return G;
 }
 
-Graph read_graph_from_edgelist(std::string filename){
+Graph read_graph_from_edgelist(std::string filename, const char *mapping_filename){
 	
 	// Open file
 	std::ifstream inFile;
@@ -157,7 +157,7 @@ Graph read_graph_from_edgelist(std::string filename){
 	} 
 	
 	std::map<std::string, int>::iterator new_it;
-	std::ofstream mapfile("mapping.txt");	
+	std::ofstream mapfile(mapping_filename);	
 	for(new_it = node_mapping.begin(); new_it != node_mapping.end(); new_it++){
 		mapfile<< new_it->first << ":" << new_it->second <<std::endl;
 	}	
