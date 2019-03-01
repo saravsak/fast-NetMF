@@ -97,7 +97,10 @@ __global__ void prune_m(double* M, int size){
 	if(id >= size) return;
 
 	if(M[id] < 1)
-		M[id] = 1;	
+		M[id] = 1;
+
+	M[id] = log(M[id]);
+
 }
 
 
@@ -306,10 +309,13 @@ int main ( int argc, char** argv  ){
 	typedef std::chrono::high_resolution_clock Clock;
 	typedef std::chrono::milliseconds milliseconds;
         Clock::time_point begin, end;
+        Clock::time_point overall_begin, overall_end;
 	info profile; 
 	profile.dataset = argv[1];
-	profile.algo = "small";
+	profile.algo = "small-sparse";
 	/* Section 0: Preliminaries */
+
+	overall_begin = Clock::now();
 
 	/* Settings */
 	int window_size = std::atoi(argv[2]);
@@ -341,11 +347,11 @@ int main ( int argc, char** argv  ){
 		}
 	}
 
-
+	begin = Clock::now();
 	/* CUDA housekeeping */
 	float num_threads = 128;
 	dim3 threads(num_threads);
-	dim3 grids((int)ceil((float)g.size/num_threads));
+	dim3 grids((int)ceil((float)(g.size*g.size)/num_threads));
 
 	/* CuSparse housekeeping */
 	cusparseHandle_t cusparse_handle;    
@@ -363,7 +369,10 @@ int main ( int argc, char** argv  ){
 	log("Creating cuBlas variables");
 	cublasHandle_t cublas_handle;
 	cublasCreate(&cublas_handle);
-	
+
+	end = Clock::now();
+	profile.init = std::chrono::duration_cast<milliseconds>(end - begin);
+
 	/* Section 1. Convert graph to sparse */	
 
 	/* Procedure 
@@ -399,6 +408,8 @@ int main ( int argc, char** argv  ){
 			g.degree, 
 			g.size * g.size * sizeof(double), 
 			cudaMemcpyHostToDevice);
+
+	
 
 	/*Step 4: Compute volume and preprocess degree */
 	preprocess_laplacian<<<grids,threads>>>(adj_device_dense, degree_device_dense, g.size);
@@ -501,6 +512,8 @@ int main ( int argc, char** argv  ){
 	}
 
 	log("Completed conversion of data from dense to sparse");
+	end = Clock::now();
+	profile.gpuio = std::chrono::duration_cast<milliseconds>(end - begin);
 
 	/* Section 2: Compute X = D^{-1/2} * A * D^{-1/2} */
 	/* Procedure
@@ -510,9 +523,14 @@ int main ( int argc, char** argv  ){
 	*/
 	
 	/* Step 1: Compute D' = D^{-1/2} */
+	begin = Clock::now();
 	log("Computing normalized D");
 	compute_d<<<grids, threads>>>(degree_csr.d_values, degree_csr.nnz);
-	
+	cudaDeviceSynchronize();
+	end = Clock::now();
+	profile.init = std::chrono::duration_cast<milliseconds>(end - begin);
+
+
 	log("Computed normalized D");
 	if(DEBUG){
 		device2host(&degree_csr, degree_csr.nnz, g.size);
@@ -533,7 +551,7 @@ int main ( int argc, char** argv  ){
 		}
 	}
 			
-
+	begin = Clock::now();
 	/* Step 2: Compute X' = D' * A */
 	log("Computing X' = D' * A");
 	csr X_temp;
@@ -568,7 +586,10 @@ int main ( int argc, char** argv  ){
 		if(VERBOSE)
 			{print_csr(g.size, X.nnz, X, "X = X' * A");}
 	}
+	end = Clock::now();
+	profile.compute_x = std::chrono::duration_cast<milliseconds>(end - begin);
 
+	begin = Clock::now();
 	/* Section 3: Compute S = sum(X^{0}....X^{window_size}) */
 	/* Procedure
 	  1. Copy X to S
@@ -657,6 +678,7 @@ int main ( int argc, char** argv  ){
 	if(DEBUG){
 		std::cout<<"Mult value"<<val<<std::endl;
 	}
+	
 
 	/* Step 2: Compute S[i] = S[i] * val */
 
@@ -680,8 +702,11 @@ int main ( int argc, char** argv  ){
 		}
 	}
 
+	end = Clock::now();
+	profile.compute_s = std::chrono::duration_cast<milliseconds>(end - begin);
 	log("Computing M");
 
+	begin = Clock::now();
 
         /* Section 5: Compute M = D^{-1/2} * S * D^{-1/2} */
 	/* Procedure
@@ -750,20 +775,20 @@ int main ( int argc, char** argv  ){
                         {print_csr(g.size, M.nnz, M, "M = M' * D");}
         }
 
-	//prune_m<<<grids,threads>>>(M.d_values, M.nnz);
+	prune_m<<<grids,threads>>>(M.d_values, M.nnz);
 	//cudaDeviceSynchronize();
 	//log("Prunied M");
 
 	/* TODO: Move this to GPU DEBUG THIS ASAP */
-        device2host(&M, M.nnz, g.size);
-        for(int i=0;i<M.nnz;i++){
-        	if(M.h_values[i] < 1){
-			M.h_values[i] = 1;
-                }
-		M.h_values[i] = log(M.h_values[i]);
-	}
+        //device2host(&M, M.nnz, g.size);
+        //for(int i=0;i<M.nnz;i++){
+        //	if(M.h_values[i] < 1){
+	//		M.h_values[i] = 1;
+        //        }
+	//	M.h_values[i] = log(M.h_values[i]);
+	//}
 
-	host2device(&M, M.nnz, g.size);
+	//host2device(&M, M.nnz, g.size);
 
 
         if(DEBUG){
@@ -857,9 +882,12 @@ int main ( int argc, char** argv  ){
 				"M cap"
 			 );
 	}
+	end = Clock::now();
+	profile.compute_m = std::chrono::duration_cast<milliseconds>(end - begin);
 			
 	/* Section 7: Compute SVD of objective matrix */	
 
+	begin = Clock::now();
 	char whichS = 'L';
 	char whichV = 'L';
 
@@ -983,7 +1011,10 @@ int main ( int argc, char** argv  ){
 
 	end = Clock::now();
 
-	profile.emb = std::chrono::duration_cast<milliseconds>(end - begin);
+	profile.svd = std::chrono::duration_cast<milliseconds>(end - begin);
+
+	overall_end = Clock::now();
+	profile.emb = std::chrono::duration_cast<milliseconds>(overall_end - overall_begin);
 	
 	write_profile("profile.txt", profile);
 	write_embeddings(argv[6],E_host, g.size, dimension);

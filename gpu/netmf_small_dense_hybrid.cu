@@ -305,18 +305,31 @@ int main (int argc, char *argv[] ){
 	/**************
  	* NetMF small *
 	**************/
+	/* Argument order 
+	1. Dataset name
+	2. Window Size
+	3. Dimension
+	4. B
+	5. Input
+	6. Output
+	7. Mapping file
+	*/
 	typedef std::chrono::high_resolution_clock Clock;
 	typedef std::chrono::milliseconds milliseconds;
         Clock::time_point begin, end;
+        Clock::time_point overall_begin, overall_end;
 	info profile; 
 	profile.dataset = argv[1];
-	profile.algo = "small";
+	profile.algo = "small-dense";
 	/* Section 0: Preliminaries */
 
 	/* Settings */
 	int window_size = std::atoi(argv[2]);
 	int dimension = std::atoi(argv[3]);
 	int b = std::atoi(argv[4]);
+
+	profile.window_size = window_size;
+	profile.dimension = dimension;
 
 	/* Load graph */
         log("Reading data from file");
@@ -345,6 +358,7 @@ int main (int argc, char *argv[] ){
 
 
 	/* CUDA housekeeping */
+	begin = Clock::now();
 	float num_threads = 128;
 	dim3 threads(num_threads);
 	dim3 grids((int)ceil((float)(g.size*g.size)/num_threads));
@@ -366,7 +380,9 @@ int main (int argc, char *argv[] ){
 	cublasHandle_t cublas_handle;
 	cublasCreate(&cublas_handle);
 
-	begin = Clock::now();
+	end = Clock::now();
+	profile.init = std::chrono::duration_cast<milliseconds>(end - begin);
+
 
 	/* Section 1. Move data to device */	
 
@@ -379,7 +395,8 @@ int main (int argc, char *argv[] ){
 	   6. Compute nnz/row of dense matrix
 	   7. Apply Dense2CSR
 	 */
-
+	
+	begin = Clock::now();
 	/* Step 1: Create dense adjacency matrix and degree matrixx on device */
 	log("Creating dense device array");
 	double *adj_device_dense;	
@@ -412,8 +429,10 @@ int main (int argc, char *argv[] ){
 
 	/*Step 4: Compute volume and preprocess degree */
 	preprocess_laplacian<<<grids,threads>>>(adj_device_dense, degree_device_dense, g.size);
+	end = Clock::now();
+	profile.gpuio = std::chrono::duration_cast<milliseconds>(end - begin);
 
-
+	begin = Clock::now();
 	log("Moved data from host to device");
 
 	/* Section 2: Compute X = D^{-1/2} * A * D^{-1/2} */
@@ -426,9 +445,13 @@ int main (int argc, char *argv[] ){
 	/* Step 1: Compute D' = D^{-1/2} */
 	log("Computing normalized D");
 	compute_d<<<grids, threads>>>(degree_device_dense, g.size);
-	
-	log("Computed normalized D");
+	cudaDeviceSynchronize();
+	end = Clock::now();
+	profile.compute_d = std::chrono::duration_cast<milliseconds>(end - begin);
 
+	log("Computed normalized D");
+	overall_begin = Clock::now();
+	begin = Clock::now();
 	/* Step 2: Compute X' = D' * A */
 	log("Computing X' = D' * A");
 	double *X_temp_device;
@@ -442,7 +465,8 @@ int main (int argc, char *argv[] ){
 		adj_device_dense, g.size, 
 		degree_device_dense, 1,
 		X_temp_device, g.size);
-
+	cudaDeviceSynchronize();
+	
 
 //	/* Step 3: Compute X = X' * D */
 	log("Computing X = X' * D");
@@ -457,8 +481,11 @@ int main (int argc, char *argv[] ){
 		degree_device_dense, 1,
 		X_device, g.size);
 	
+	cudaDeviceSynchronize();	
 	cudaFree(X_temp_device);
 	cudaFree(adj_device_dense);
+	end = Clock::now();
+	profile.compute_x = std::chrono::duration_cast<milliseconds>(end - begin);
 
 
 	/* Section 3: Compute S = sum(X^{0}....X^{window_size}) */
@@ -484,6 +511,7 @@ int main (int argc, char *argv[] ){
 	const double alpha = 1.00;
 	double beta = 1.00;
 
+	begin = Clock::now();
 	/* Step 1: Copy X to S */
 	log("Copying X to S");
 
@@ -562,7 +590,10 @@ int main (int argc, char *argv[] ){
                     S_device, 1);
 
 	//S_host = (double *) malloc(g.size * g.size * sizeof(double));
+	end = Clock::now();
+	profile.compute_s = std::chrono::duration_cast<milliseconds>(end - begin);
 
+	begin = Clock::now();
 	log("Computing M");
 
         /* Section 5: Compute M = D^{-1/2} * S * D^{-1/2} */
@@ -667,9 +698,12 @@ int main (int argc, char *argv[] ){
 
 	device2host(&M_cap, M_cap.nnz, g.size);
 	log("Completed conversion of data from dense to sparse");
-			
+	end = Clock::now();
+	profile.compute_m = std::chrono::duration_cast<milliseconds>(end - begin);
+		
 	/* Section 7: Compute SVD of objective matrix */	
 
+	begin = Clock::now();
 	char whichS = 'L';
 	char whichV = 'L';
 
@@ -794,7 +828,13 @@ int main (int argc, char *argv[] ){
 	cudaMemcpy(E_host, E_device, g.size * dimension * sizeof(double), cudaMemcpyDeviceToHost);
 
 	end = Clock::now();
-	profile.emb = std::chrono::duration_cast<milliseconds>(end - begin);
+	profile.svd = std::chrono::duration_cast<milliseconds>(end - begin);
+
+
+	overall_end = Clock::now();
+	profile.emb = std::chrono::duration_cast<milliseconds>(overall_end - overall_begin);
+
+
 	write_profile("profile.txt", profile);
 	write_embeddings(argv[6],E_host, g.size, dimension);
 
