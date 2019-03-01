@@ -299,24 +299,33 @@ void multiply_csr(csr *A, csr *B, csr *C, int m, int n, int k, cusparseHandle_t 
 	cudaDeviceSynchronize();
 }
 
-int main ( void ){
+int main ( int argc, char** argv  ){
 	/**************
  	* NetMF small *
 	**************/
-
+	typedef std::chrono::high_resolution_clock Clock;
+	typedef std::chrono::milliseconds milliseconds;
+        Clock::time_point begin, end;
+	info profile; 
+	profile.dataset = argv[1];
+	profile.algo = "small";
 	/* Section 0: Preliminaries */
 
 	/* Settings */
-	int window_size = 3;//10;
-	int dimension = 128;
-	int b = 1;
+	int window_size = std::atoi(argv[2]);
+	int dimension = std::atoi(argv[3]);
+	int b = std::atoi(argv[4]);
 
 	/* Load graph */
         log("Reading data from file");
 	
 	//Graph g =  read_graph("../data/test/small_test.csv","edgelist");
-	//Graph g =  read_graph("../data/ppi/ppi.edgelist","edgelist");
-	Graph g =  read_graph("../data/blogcatalog/edges.csv","edgelist");
+	Graph g =  read_graph(argv[5],"edgelist", argv[7]);
+	begin = Clock::now(); 
+	//Graph g =  read_graph("../../nrl-data/wikipedia.edgelist","edgelist");
+	end = Clock::now();
+
+	profile.iptime = std::chrono::duration_cast<milliseconds>(end - begin);
 	
 	if(DEBUG){
 		if(VERBOSE){
@@ -367,6 +376,7 @@ int main ( void ){
 	   7. Apply Dense2CSR
 	 */
 
+	begin = Clock::now();
 	/* Step 1: Create dense adjacency matrix and degree matrixx on device */
 	log("Creating dense device array");
 	double *adj_device_dense;	
@@ -932,13 +942,18 @@ int main ( void ){
 			res_mkl);
 	log("Computed SVD via MKL");
 
+	if(mkl_status){
+		std::cout<<"SVD failed"<<std::endl;
+		exit(0);	
+	}
+
 	if(DEBUG){
 	std::cout<<"Number of singular found: "<<k<<std::endl;
 	for(int i=0;i<k0;i++){ std::cout<<E_mkl[i]<<" ";} std::cout<<"\n";
 	}
 
 	double *U_device, *Si_device;
-	double *U_host;
+	//double *U_host;
 	double *Si_host;
 	double *E_device, *E_host;
 
@@ -946,7 +961,7 @@ int main ( void ){
 	cudaMalloc(&E_device, g.size * dimension * sizeof(double));
 	cudaMalloc(&Si_device, dimension * sizeof(double));
 
-	U_host = (double *) malloc(g.size * dimension * sizeof(double));
+	//U_host = (double *) malloc(g.size * dimension * sizeof(double));
 	E_host = (double *) malloc(g.size * dimension * sizeof(double));
 	Si_host = (double *) malloc(dimension * sizeof(double));
 
@@ -966,7 +981,12 @@ int main ( void ){
 
 	cudaMemcpy(E_host, E_device, g.size * dimension * sizeof(double), cudaMemcpyDeviceToHost);
 
-	write_embeddings("blogcatalog.emb",E_host, g.size, dimension);
+	end = Clock::now();
+
+	profile.emb = std::chrono::duration_cast<milliseconds>(end - begin);
+	
+	write_profile("profile.txt", profile);
+	write_embeddings(argv[6],E_host, g.size, dimension);
 
 	mkl_free(rows_start);	
 	mkl_free(rows_end);	
