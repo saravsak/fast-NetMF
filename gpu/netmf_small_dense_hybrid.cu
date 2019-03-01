@@ -301,25 +301,34 @@ void multiply_csr(csr *A, csr *B, csr *C, int m, int n, int k, cusparseHandle_t 
 	cudaDeviceSynchronize();
 }
 
-int main ( void ){
+int main (int argc, char *argv[] ){
 	/**************
  	* NetMF small *
 	**************/
-
+	typedef std::chrono::high_resolution_clock Clock;
+	typedef std::chrono::milliseconds milliseconds;
+        Clock::time_point begin, end;
+	info profile; 
+	profile.dataset = argv[1];
+	profile.algo = "small";
 	/* Section 0: Preliminaries */
 
 	/* Settings */
-	int window_size = 3;//10;
-	int dimension = 128;
-	int b = 1;
+	int window_size = std::atoi(argv[2]);
+	int dimension = std::atoi(argv[3]);
+	int b = std::atoi(argv[4]);
 
 	/* Load graph */
         log("Reading data from file");
 	
 	//Graph g =  read_graph("../data/test/small_test.csv","edgelist");
-	//Graph g =  read_graph("../data/ppi/ppi.edgelist","edgelist");
-	Graph g =  read_graph("../data/blogcatalog/edges.csv","edgelist");
-	
+	Graph g =  read_graph(argv[5],"edgelist", argv[7]);
+	begin = Clock::now(); 
+	//Graph g =  read_graph("../../nrl-data/wikipedia.edgelist","edgelist");
+	end = Clock::now();
+
+	profile.iptime = std::chrono::duration_cast<milliseconds>(end - begin);
+
 	if(DEBUG){
 		if(VERBOSE){
 			log("Printing adj matrix");
@@ -356,7 +365,9 @@ int main ( void ){
 	log("Creating cuBlas variables");
 	cublasHandle_t cublas_handle;
 	cublasCreate(&cublas_handle);
-	
+
+	begin = Clock::now();
+
 	/* Section 1. Move data to device */	
 
 	/* Procedure 
@@ -373,20 +384,20 @@ int main ( void ){
 	log("Creating dense device array");
 	double *adj_device_dense;	
 	double *degree_device_dense; 
-	double *adj_host_dense;	
-	double *degree_host_dense; 
+	//double *adj_host_dense;	
+	//double *degree_host_dense; 
 
 	/* Step 2a: Allocate space for adjacency and degree matrix on device*/
 	log("Allocating space for degree and adjacency mat on device");
 	cudaMalloc(&adj_device_dense, 
 			g.size * g.size * sizeof(double)); 	
 	cudaMalloc(&degree_device_dense, 
-			g.size * g.size * sizeof(double)); 
+			g.size * sizeof(double)); 
 
 	/* Step 2a: Allocate space for adjacency and degree matrix on host */
 	log("Allocating space for degree and adjacency matrix on host");
-	adj_host_dense = (double *) malloc(g.size * g.size * sizeof(double));
-	degree_host_dense = (double *) malloc(g.size * g.size * sizeof(double));
+	//adj_host_dense = (double *) malloc(g.size * g.size * sizeof(double));
+	//degree_host_dense = (double *) malloc(g.size * sizeof(double));
 
 	/* Step 3: Copy dense matrix from host to device */
 	log("Copying dense matrix from host to device");	
@@ -421,7 +432,7 @@ int main ( void ){
 	/* Step 2: Compute X' = D' * A */
 	log("Computing X' = D' * A");
 	double *X_temp_device;
-	double *X_temp_host;
+	//double *X_temp_host;
 
 	cudaMalloc(&X_temp_device, g.size * g.size * sizeof(double));
 	cudaMemset(X_temp_device, 0, g.size * g.size);
@@ -436,7 +447,7 @@ int main ( void ){
 //	/* Step 3: Compute X = X' * D */
 	log("Computing X = X' * D");
 	double *X_device;
-	double *X_host;
+	//double *X_host;
 	cudaMalloc(&X_device, g.size * g.size * sizeof(double));
 	cudaMemset(X_device, 0, g.size * g.size);
 
@@ -461,10 +472,14 @@ int main ( void ){
 	*/
 	
 	/* Step 0: Declare all variables */
-	double *S_device, *S_host;
-	double *W_device, *W_host;
-	double *S_temp_device, *S_temp_host;
-	double *W_temp_device, *W_temp_host;	
+	double *S_device;
+        //double *S_host;
+	double *W_device;
+        //double *W_host;
+	double *S_temp_device;
+        //double *S_temp_host;
+	double *W_temp_device;
+        //double *W_temp_host;	
 
 	const double alpha = 1.00;
 	double beta = 1.00;
@@ -546,7 +561,7 @@ int main ( void ){
                     &val,
                     S_device, 1);
 
-	S_host = (double *) malloc(g.size * g.size * sizeof(double));
+	//S_host = (double *) malloc(g.size * g.size * sizeof(double));
 
 	log("Computing M");
 
@@ -560,7 +575,7 @@ int main ( void ){
 	log("Computing M' = D' * S");
 
 	double *M_temp_device;
-	double *M_host;
+	//double *M_host;
 
 	cudaMalloc(&M_temp_device, g.size * g.size * sizeof(double));
 
@@ -735,6 +750,13 @@ int main ( void ){
 			K_L_mkl,
 			K_R_mkl,
 			res_mkl);
+	
+	if(mkl_status){
+		std::cout<<"SVD failed"<<std::endl;
+		exit(0);	
+	}
+
+
 	log("Computed SVD via MKL");
 
 	if(DEBUG){
@@ -743,7 +765,7 @@ int main ( void ){
 	}
 
 	double *U_device, *Si_device;
-	double *U_host;
+	//double *U_host;
 	double *Si_host;
 	double *E_device, *E_host;
 
@@ -751,7 +773,7 @@ int main ( void ){
 	cudaMalloc(&E_device, g.size * dimension * sizeof(double));
 	cudaMalloc(&Si_device, dimension * sizeof(double));
 
-	U_host = (double *) malloc(g.size * dimension * sizeof(double));
+	//U_host = (double *) malloc(g.size * dimension * sizeof(double));
 	E_host = (double *) malloc(g.size * dimension * sizeof(double));
 	Si_host = (double *) malloc(dimension * sizeof(double));
 
@@ -771,7 +793,10 @@ int main ( void ){
 
 	cudaMemcpy(E_host, E_device, g.size * dimension * sizeof(double), cudaMemcpyDeviceToHost);
 
-	write_embeddings("blogcatalog.emb",E_host, g.size, dimension);
+	end = Clock::now();
+	profile.emb = std::chrono::duration_cast<milliseconds>(end - begin);
+	write_profile("profile.txt", profile);
+	write_embeddings(argv[6],E_host, g.size, dimension);
 
 	mkl_free(rows_start);	
 	mkl_free(rows_end);	
