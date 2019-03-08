@@ -42,13 +42,13 @@ void Graph::add_edge(int i, int j, double weight=1.0)
 		if(this->adj[i * this->size + j]==0){
 			this->adj[i * this->size + j] = weight;
 			this->volume += weight;
+			if(i!=j){
+				this->degree[i * this->size + i] += weight;
+				this->degree1D[i] += weight;
+			}
 		}
 		//if(this->degree[i * this->size + i] == -1)
 		//	this->degree[i * this->size + i] = 0;
-		if(i!=j){
-			this->degree[i * this->size + i] += weight;
-			this->degree1D[i] += weight;
-		}
 	//}
 }
 void Graph::info(){
