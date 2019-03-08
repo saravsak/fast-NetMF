@@ -20,7 +20,16 @@
 
 #define DEBUG true
 #define VERBOSE false
+#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
 
+inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
+{
+   if (code != cudaSuccess) 
+   {
+      fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+      if (abort) exit(code);
+   }
+}
 
 void print_csr(
     int m,
@@ -43,9 +52,9 @@ __global__ void preprocess_laplacian(double* adj, double *degree, int size){
 		
 	if(degree[id] == 0){
 			degree[id] = 1.00;
-			adj[id] = 1.00;	
+			adj[id*size+id] = 1.00;	
 	}else{
-			adj[id] = 0.0;
+			adj[id*size+id] = 0.0;
 	}	
 }
 __global__ void compute_d(double* deg, int size){
@@ -301,39 +310,75 @@ void multiply_csr(csr *A, csr *B, csr *C, int m, int n, int k, cusparseHandle_t 
 	cudaDeviceSynchronize();
 }
 
-int main ( void ){
-	/**************
- 	* NetMF large *
-	**************/
+__global__ void unbalanced_dgmm(double *diag, double *mat, int m, int n, int k){
+	int row = blockIdx.y * blockDim.x + threadIdx.y;
+	int col = blockIdx.x * blockDim.y + threadIdx.x;
 
+	if(row >= n || col >= k) return;
+
+	mat[row + col * n] = mat[row+col*n] * diag[row];
+	
+}
+
+
+__global__ void deepwalk_filter(double *A, int size, double window){
+	int id = blockIdx.x * blockDim.x + threadIdx.x;
+
+	if(id >= size) return;
+
+	if(A[id] >= 1){
+		A[id] = 1;
+	}else{
+		A[id] = (A[id] * (1 - pow(A[id], window))) / ((1-A[id]) * window);
+	}
+
+	if(A[id] <= 0)
+		A[id] = 0;
+
+	A[id] = sqrt(A[id]);
+
+}
+
+int main ( int argc, char **argv ){
+	/**************
+ 	* NetMF small *
+	**************/
+	/* Argument order 
+	1. Dataset name
+	2. Window Size
+	3. Dimension
+	4. B
+	5. Input
+	6. Output
+	7. Mapping file
+	8. Eigen rank
+	*/
+	typedef std::chrono::high_resolution_clock Clock;
+	typedef std::chrono::milliseconds milliseconds;
+        Clock::time_point begin, end;
+        Clock::time_point overall_begin, overall_end;
+	info profile; 
+	profile.dataset = argv[1];
+	profile.algo = "small-dense";
 	/* Section 0: Preliminaries */
 
 	/* Settings */
-	int window_size = 3;//10;
-	int dimension = 128;
-	int b = 1;
-	int rank = 256;
+	int window_size = std::atoi(argv[2]);
+	int dimension = std::atoi(argv[3]);
+	int b = std::atoi(argv[4]);
+	int rank = std::atoi(argv[8]);
+
+	profile.window_size = window_size;
+	profile.dimension = dimension;
 
 	/* Load graph */
         log("Reading data from file");
 	
-	//Graph g =  read_graph("../data/test/small_test.csv","edgelist");
-	//Graph g =  read_graph("../data/ppi/ppi.edgelist","edgelist");
-	Graph g =  read_graph("../data/blogcatalog/edges.csv","edgelist");
-	
-	if(DEBUG){
-		if(VERBOSE){
-			log("Printing adj matrix");
-			print_matrix(g.adj, g.size);
-		}
-	}	
-	
-	log("Printing degree matrix");
-	if(DEBUG){
-		if(VERBOSE){
-			print_matrix(g.degree, g.size);
-		}
-	}
+	begin = Clock::now(); 
+	Graph g =  read_graph(argv[5],"edgelist", argv[7]);
+	end = Clock::now();
+
+	profile.iptime = std::chrono::duration_cast<milliseconds>(end - begin);
 
 
 	/* CUDA housekeeping */
@@ -386,12 +431,12 @@ int main ( void ){
 	cudaMalloc(&adj_device_dense, 
 			g.size * g.size * sizeof(double)); 	
 	cudaMalloc(&degree_device_dense, 
-			g.size * g.size * sizeof(double)); 
+			g.size * sizeof(double)); 
 
 	/* Step 2a: Allocate space for adjacency and degree matrix on host */
 	log("Allocating space for degree and adjacency matrix on host");
 	adj_host_dense = (double *) malloc(g.size * g.size * sizeof(double));
-	degree_host_dense = (double *) malloc(g.size * g.size * sizeof(double));
+	degree_host_dense = (double *) malloc(g.size * sizeof(double));
 
 	/* Step 3: Copy dense matrix from host to device */
 	log("Copying dense matrix from host to device");	
@@ -404,9 +449,16 @@ int main ( void ){
 			g.size * sizeof(double), 
 			cudaMemcpyHostToDevice);
 
+	/*REMOVE*/
+	//std::sort(g.degree1D, g.degree1D + g.size);
+	//cudaMemcpy(degree_host_dense, degree_device_dense, g.size * sizeof(double), cudaMemcpyDeviceToHost);
+
 	/*Step 4: Compute volume and preprocess degree */
 	preprocess_laplacian<<<grids,threads>>>(adj_device_dense, degree_device_dense, g.size);
 
+	/*REMOVE*/
+	//cudaMemcpy(g.degree1D, degree_device_dense, g.size * sizeof(double), cudaMemcpyDeviceToHost);
+	//std::sort(g.degree1D, g.degree1D + g.size);
 
 	log("Moved data from host to device");
 
@@ -420,8 +472,12 @@ int main ( void ){
 	/* Step 1: Compute D' = D^{-1/2} */
 	log("Computing normalized D");
 	compute_d<<<grids, threads>>>(degree_device_dense, g.size);
-	
-	log("Computed normalized D");
+	cudaDeviceSynchronize();
+
+	/*REMOVE*/
+	//cudaMemcpy(degree_host_dense, degree_device_dense, g.size * sizeof(double), cudaMemcpyDeviceToHost);
+	//std::sort(g.degree1D, g.degree1D + g.size);
+	//log("Computed normalized D");
 
 	/* Step 2: Compute X' = D' * A */
 	log("Computing X' = D' * A");
@@ -454,8 +510,14 @@ int main ( void ){
 	
 	cudaFree(X_temp_device);
 
+	/*REMOVE*/
+	//X_host = (double *) malloc(sizeof(double) * g.size * g.size);
+	//cudaMemcpy(X_host, X_device, g.size * g.size * sizeof(double), cudaMemcpyDeviceToHost);
+	//std::sort(X_host, X_host + (g.size * g.size));	
+	//cudaMemcpy(degree_host_dense, degree_device_dense, g.size * sizeof(double), cudaMemcpyDeviceToHost);
 	/* Section 3: Compute Eig(X) */	
 
+	log("Eigen(X)");
 	cusolverEigMode_t jobz = CUSOLVER_EIG_MODE_VECTOR;
 	cusolverEigRange_t range = CUSOLVER_EIG_RANGE_I;
 	cublasFillMode_t uplo = CUBLAS_FILL_MODE_LOWER;	
@@ -466,8 +528,11 @@ int main ( void ){
 	cudaMalloc(&devInfo, sizeof(int));
 
 	double *e_device;
-	cudaMalloc(&e_device, dimension * sizeof(double));
+	double *EV_device;
+	cudaMalloc(&e_device, g.size * sizeof(double));
+	cudaMalloc(&EV_device, g.size * rank * sizeof(double));
 
+	log("Computing buffersize");
 	cusolverDnDsyevdx_bufferSize(
 	    cusolverH,
 	    jobz, 
@@ -486,6 +551,7 @@ int main ( void ){
 
 	cudaMalloc(&d_work, sizeof(double) * lwork);
 
+	log("Computing Eigen");
 	cusolverDnDsyevdx(
 	    cusolverH,
 	    jobz, 
@@ -496,340 +562,310 @@ int main ( void ){
 	    LDA,
 	    0.00,
 	    0.00,
-	    1,
-	    rank,
+	    g.size - rank + 1,
+	    g.size,
 	    &h_meig,
 	    e_device, 
 	    d_work,
 	    lwork,
 	    devInfo);
+	cudaMemcpy(EV_device, X_device, g.size * rank * sizeof(double), cudaMemcpyDeviceToDevice);
+	log("Computed eigen");
+
+	/*REMOVE*/
+	double *e_host;
+	e_host = (double *)malloc(g.size * sizeof(double));
+	////cudaMemcpy(e_host, e_device, g.size * sizeof(double), cudaMemcpyDeviceToHost);
+	//double *EV_host;
+	//EV_host = (double *) malloc(sizeof(double) * g.size * rank);
+	//gpuErrchk(cudaMemcpy(EV_host, X_device, g.size * rank * sizeof(double), cudaMemcpyDeviceToHost));
+	//
+	//cudaMemcpy(degree_host_dense, degree_device_dense, g.size * sizeof(float), cudaMemcpyDeviceToHost);
+
+	num_threads = 32;
+	dim3 threads2D(num_threads,num_threads);
+	dim3 grids2D(ceil(((float)g.size)/num_threads), ceil(((float)rank/num_threads)));
+
+	double *D_rt_invU_device;
+	cudaMalloc(&D_rt_invU_device, g.size * rank * sizeof(double));
+	cublasDdgmm(cublas_handle, CUBLAS_SIDE_LEFT,
+		g.size, rank,
+		EV_device, g.size, 
+		degree_device_dense, 1,
+		EV_device, g.size);
+
+	cudaDeviceSynchronize();
+
+	deepwalk_filter<<<grids,threads>>>(e_device, rank, window_size);	
+	cudaDeviceSynchronize();
+
+	cudaMemcpy(e_host, e_device, rank * sizeof(double), cudaMemcpyDeviceToHost);
+	
+	for(int i=0;i<rank;i++){
+		std::cout<<e_host[i]<<" ";
+	}
+
+	///*REMOVE*/
+	//cudaMemcpy(EV_host, EV_device, g.size * rank * sizeof(double), cudaMemcpyDeviceToHost);
+	//std::cout<<std::endl;
+	//for(int i=0;i<g.size * rank;i++){
+	//	std::cout<<"EV "<<i<<":"<<EV_host[i]<<std::endl;
+	//}	
+
+	cublasDdgmm(cublas_handle, CUBLAS_SIDE_RIGHT,
+		g.size, rank,
+		EV_device, g.size, 
+		e_device, 1,
+		EV_device, g.size);
+	cudaDeviceSynchronize();
+		
+	/*REMOVE*/
+	//cudaMemcpy(EV_host, EV_device, g.size * rank * sizeof(double), cudaMemcpyDeviceToHost);
+	//for(int i=0;i<g.size * rank;i++){
+	//	std::cout<<"EV "<<i<<":"<<EV_host[i]<<std::endl;
+	//}	
 
 
-//	/* Section 3: Compute S = sum(X^{0}....X^{window_size}) */
-//	/* Procedure
-//	  1. Copy X to S
-//	  2. Copy X to W
-//	  3. W' = W * X
-//	  4. S' = S + W'  
-//	  5. W = W'
-//	  6. S = S'
-//	*/
-//	
-//	/* Step 0: Declare all variables */
-//	double *S_device, *S_host;
-//	double *W_device, *W_host;
-//	double *S_temp_device, *S_temp_host;
-//	double *W_temp_device, *W_temp_host;	
-//
-//	const double alpha = 1.00;
-//	double beta = 1.00;
-//
-//	/* Step 1: Copy X to S */
-//	log("Copying X to S");
-//
-//	cudaMalloc(&S_temp_device, g.size * g.size * sizeof(double));
-//	cudaMalloc(&S_device, g.size * g.size *sizeof(double));
-//	cudaMemcpy(S_device, X_device, g.size * g.size * sizeof(double), cudaMemcpyDeviceToDevice);
-//
-//	/* Step 2: Copy X to temp */
-//	log("Copying X to W");
-//	
-//	cudaMalloc(&W_temp_device, g.size * g.size * sizeof(double));
-//	cudaMalloc(&W_device, g.size * g.size *sizeof(double));
-//	cudaMemcpy(W_device, X_device, g.size * g.size * sizeof(double), cudaMemcpyDeviceToDevice);
-//
-//	for(int i=2;i<=window_size;i++){
-//		/* Step 3: temp' = temp * X */
-//		log("Computing W' = W * X");
-//		cudaMemset(W_temp_device, 0, g.size * g.size);
-//		beta = 0;
-//		cublasDgemm(cublas_handle, 
-//				CUBLAS_OP_N, CUBLAS_OP_N,
-//				g.size, g.size, g.size,
-//				&alpha,
-//				W_device, LDA,
-//				X_device, LDA,
-//				&beta,
-//				W_temp_device, LDA);
-//
-//		/* Step 4: S = S + temp */
-//		log("Computing S' = S + W'");
-//		cudaMemset(S_temp_device, 0, g.size * g.size);
-//		beta = 1;
-//		cublasDgeam(cublas_handle,
-//				CUBLAS_OP_N, CUBLAS_OP_N,
-//				g.size, g.size,
-//				&alpha,
-//				S_device, LDA,
-//				&beta,
-//				W_temp_device, LDA,
-//				S_temp_device, LDA);
-//
-//		/* Step 5: temp = temp' */
-//		log("Copying W' to W");
-//		cudaMemset(W_device, 0, g.size * g.size);
-//		cudaMemcpy(W_device, W_temp_device, g.size * g.size * sizeof(double), cudaMemcpyDeviceToDevice);
-//
-//		/* Step 6: S = S' */
-//		log("Copying S' to S");
-//		cudaMemset(S_device, 0, g.size * g.size);
-//		cudaMemcpy(S_device, S_temp_device, g.size * g.size * sizeof(double), cudaMemcpyDeviceToDevice);
-//	}
-//
-//	cudaFree(S_temp_device);
-//	cudaFree(W_temp_device);
-//	cudaFree(W_device);
-//
-//        /* Section 4: Compute S = S * (vol / (window_size * b)) */
-//
-//	/* Procedure 
-//	   1. Compute val = vol / (window_size * b)
-//	   2. Compute S[i] = S[i] / val
-//	*/
-//
-//	log("Applying Transformation on S");
-//	/* Step 1: Compute val = vol / (window_size * b) */
-//	const double val = ((double) g.volume)/(((double) window_size) * ((double) b));
-//
-//	if(DEBUG){
-//		std::cout<<"Mult value"<<val<<std::endl;
-//	}
-//
-//	/* Step 2: Compute S[i] = S[i] * val */
-//
-//	cublasDscal(cublas_handle, g.size * g.size,
-//                    &val,
-//                    S_device, 1);
-//
-//	S_host = (double *) malloc(g.size * g.size * sizeof(double));
-//
-//	log("Computing M");
-//
-//        /* Section 5: Compute M = D^{-1/2} * S * D^{-1/2} */
-//	/* Procedure
-//	   1. Compute M' = D' * S
-//	   2. Compute M = M' * D'
-//	*/
-//
-//	/* Step 1: Compute M' = D' * S */
-//	log("Computing M' = D' * S");
-//
-//	double *M_temp_device;
-//	double *M_host;
-//
-//	cudaMalloc(&M_temp_device, g.size * g.size * sizeof(double));
-//
-//	cublasDdgmm(cublas_handle, CUBLAS_SIDE_LEFT,
-//		g.size, g.size,
-//		S_device, g.size, 
-//		degree_device_dense, 1,
-//		M_temp_device, g.size);
-//
-//	cudaFree(S_device);
-//
-//	log("Computing M = M' * S'");
-//	double *M_device;
-//	cudaMalloc(&M_device, g.size * g.size * sizeof(double));
-//
-//	cublasDdgmm(cublas_handle, CUBLAS_SIDE_RIGHT,
-//		g.size, g.size,
-//		M_temp_device, g.size, 
-//		degree_device_dense, 1,
-//		M_device, g.size);
-//
-//	cudaFree(M_temp_device);
-//
-//	/* Section 6: Compute M'' = log(max(M,1)) */
-//	
-//	/* Procedure 
-//	   1. Prune M and take log
-//	   2. Create CSR struct for M''
-//	   3. Compute nnzPerVector for M''
-//	*/
-//
-//	/* Step 1: Prune M and take log */
-//	log("Pruning M");
-//
-//	prune_m<<<grids,threads>>>(M_device, g.size);
-//       	cudaDeviceSynchronize(); 
-//
-//	log("Pruned M");
-//
-//	/* Step 2: Create CSR struct for both matrices */
-//	log("Converting dense matrix to CSR format");	
-//	csr M_cap;    /* Variable to hold adjacency matrix in CSR format */
-//
-//	M_cap.nnz = 0; /* Initialize number of non zeros in adjacency matrix */
-//
-//	/* Step 6: Compute nnz/row of dense matrix */	
-//	log("Computing nnzPerVector for M''");
-//
-//	cudaMalloc(&M_cap.d_nnzPerVector, 
-//			g.size * sizeof(int));
-//	cusparseDnnz(cusparse_handle, 
-//			CUSPARSE_DIRECTION_ROW, 
-//			g.size, g.size, 
-//			mat_descr, 
-//			M_device, LDA, 
-//			M_cap.d_nnzPerVector, &M_cap.nnz);
-//	M_cap.h_nnzPerVector = (int *)malloc(g.size * sizeof(int));
-//	cudaMemcpy(M_cap.h_nnzPerVector, 
-//			M_cap.d_nnzPerVector, 
-//			g.size * sizeof(int), 
-//			cudaMemcpyDeviceToHost); 
-//	if(DEBUG){
-//    		printf("Number of nonzero elements in dense adjacency matrix = %i\n", M_cap.nnz);
-//    		
-//		if(VERBOSE)
-//		for (int i = 0; i < g.size; ++i) printf("Number of nonzero elements in row %i for matrix = %i \n", i, M_cap.h_nnzPerVector[i]);
-//	}
-//
-//
-//	/* Step 6: Convert dense matrix to sparse matrices */
-//	allocate_csr(&M_cap, M_cap.nnz, g.size);
-//	cusparseDdense2csr(cusparse_handle, 
-//			g.size, g.size, 
-//			mat_descr,
-//		       	M_device,	
-//			LDA, 
-//			M_cap.d_nnzPerVector, 
-//			M_cap.d_values, M_cap.d_rowIndices, M_cap.d_colIndices); 
-//	if(VERBOSE){
-//		device2host(&M_cap, M_cap.nnz, g.size);	
-//		print_csr(
-//    			g.size,
-//    			M_cap.nnz,
-//    			M_cap,
-//    			"Adjacency matrix");
-//	}
-//
-//	cudaFree(M_device);
-//
-//	device2host(&M_cap, M_cap.nnz, g.size);
-//	log("Completed conversion of data from dense to sparse");
-//			
-//	/* Section 7: Compute SVD of objective matrix */	
-//
-//	char whichS = 'L';
-//	char whichV = 'L';
-//
-//	MKL_INT pm[128];
-//	mkl_sparse_ee_init(pm);
-//	//pm[1] = 100;
-//	//pm[2] = 2;
-//	//pm[4] = 60;
-//
-//	MKL_INT mkl_rows = g.size;
-//	MKL_INT mkl_cols = g.size;
-//
-//
-//	//MKL_INT rows_start[mkl_rows];
-//	//MKL_INT rows_end[mkl_rows];
-//
-//	MKL_INT *rows_start;
-//	MKL_INT *rows_end;
-//
-//	rows_start = (MKL_INT *)mkl_malloc(mkl_rows * sizeof(MKL_INT),64);
-//	rows_end = (MKL_INT *)mkl_malloc(mkl_rows * sizeof(MKL_INT),64);
-//
-//	for(int i=0;i<mkl_rows;i++){
-//		rows_start[i] = M_cap.h_rowIndices[i];
-//		rows_end[i] = M_cap.h_rowIndices[i+1];
-//	}
-//
-//	
-//	//MKL_INT mkl_col_idx[M_cap.nnz];
-//
-//	MKL_INT *mkl_col_idx;
-//	mkl_col_idx = (MKL_INT*)mkl_malloc(M_cap.nnz * sizeof(MKL_INT), 64);
-//
-//	int mkl_temp;
-//	for(int i=0;i<M_cap.nnz;i++){
-//		mkl_temp = M_cap.h_colIndices[i];
-//		mkl_col_idx[i] = mkl_temp;
-//	}
-//
-//
-//	sparse_matrix_t M_mkl;
-//	sparse_index_base_t indexing = SPARSE_INDEX_BASE_ZERO;
-//
-//	mkl_sparse_d_create_csr(&M_mkl, indexing,
-//					mkl_rows, mkl_cols,
-//					rows_start, rows_end,
-//					mkl_col_idx, M_cap.h_values);
-//
-//	log("Created MKL sparse");
-//
-//	matrix_descr mkl_descrM;
-//	mkl_descrM.type = SPARSE_MATRIX_TYPE_GENERAL;	
-//	mkl_descrM.mode = SPARSE_FILL_MODE_UPPER;
-//	mkl_descrM.diag = SPARSE_DIAG_NON_UNIT;
-//
-//	MKL_INT k0 = dimension;
-//	MKL_INT k;
-//
-//	double *E_mkl, *K_L_mkl, *K_R_mkl, *res_mkl;
-//
-//	E_mkl = (double *)mkl_malloc(k0 * sizeof(double), 128);
-//	K_L_mkl = (double *)mkl_malloc( k0*mkl_rows*sizeof( double), 128 );
-//        K_R_mkl = (double *)mkl_malloc( k0*mkl_cols*sizeof( double), 128 );
-//        res_mkl = (double *)mkl_malloc( k0*sizeof( double), 128 );
-//
-//	memset(E_mkl, 0 , k0);
-//	memset(K_L_mkl, 0 , k0);
-//	memset(K_R_mkl, 0 , k0);
-//	memset(res_mkl, 0 , k0);
-//
-//	int mkl_status = 0;
-//
-//	log("Computing SVD via MKL");
-//	mkl_status = mkl_sparse_d_svd(&whichS, &whichV, pm,
-//			M_mkl, mkl_descrM,
-//			k0, &k,
-//			E_mkl,
-//			K_L_mkl,
-//			K_R_mkl,
-//			res_mkl);
-//	log("Computed SVD via MKL");
-//
-//	if(DEBUG){
-//	std::cout<<"Number of singular found: "<<k<<std::endl;
-//	for(int i=0;i<k0;i++){ std::cout<<E_mkl[i]<<" ";} std::cout<<"\n";
-//	}
-//
-//	double *U_device, *Si_device;
-//	double *U_host;
-//	double *Si_host;
-//	double *E_device, *E_host;
-//
-//	cudaMalloc(&U_device, g.size * dimension * sizeof(double));
-//	cudaMalloc(&E_device, g.size * dimension * sizeof(double));
-//	cudaMalloc(&Si_device, dimension * sizeof(double));
-//
-//	U_host = (double *) malloc(g.size * dimension * sizeof(double));
-//	E_host = (double *) malloc(g.size * dimension * sizeof(double));
-//	Si_host = (double *) malloc(dimension * sizeof(double));
-//
-//	cudaMemcpy(U_device, K_L_mkl, g.size * dimension * sizeof(double), cudaMemcpyHostToDevice);
-//	cudaMemcpy(Si_device, E_mkl, dimension * sizeof(double), cudaMemcpyHostToDevice);
-//
-//	transform_si<<<grids,threads>>>(Si_device, dimension);
-//
-//	cudaMemcpy(Si_host, Si_device, dimension * sizeof(double), cudaMemcpyDeviceToHost);
-//
-//	std::cout<<"\n";
-//	cublasDdgmm(cublas_handle, CUBLAS_SIDE_RIGHT,
-//		g.size, dimension,
-//		U_device, g.size, 
-//		Si_device, 1.0,
-//		E_device, g.size);
-//
-//	cudaMemcpy(E_host, E_device, g.size * dimension * sizeof(double), cudaMemcpyDeviceToHost);
-//
-//	write_embeddings("blogcatalog.emb",E_host, g.size, dimension);
-//
-//	mkl_free(rows_start);	
-//	mkl_free(rows_end);	
-//	mkl_free(mkl_col_idx);	
-//
+	log("Computing M");
+
+        /* Section 5: Compute M = (EV_device * EV_device.T) * (vol/b) */
+
+	double *M_device;
+	cudaMalloc(&M_device, g.size * g.size * sizeof(double));
+
+	double alf = 1.00;
+	double beta = 0.00;
+
+	cublasDgemm(cublas_handle,
+                           CUBLAS_OP_N, CUBLAS_OP_T,
+                           g.size, g.size, rank,
+                           &alf,
+                           EV_device, g.size,
+                           EV_device, g.size,
+                           &beta,
+			   M_device, g.size
+                           );
+	cudaDeviceSynchronize();
+
+	/*REMOVE*/
+	//std::cout<<std::endl;
+	//double *M_host;
+	//M_host = (double *) malloc(sizeof(double) * g.size * g.size);
+	//cudaMemcpy(M_host, M_device, g.size * g.size * sizeof(double), cudaMemcpyDeviceToHost);
+	//for(int i=0;i<g.size * g.size;i++){
+	//	std::cout<<"M "<<i<<":"<<M_host[i]<<std::endl;
+	//}
+
+	
+	double val = ((double) g.volume) / ((double) b);
+	cublasDscal(cublas_handle, g.size * g.size,
+			&val,
+			M_device, 1);
+	
+	/*REMOVE*/
+	//std::cout<<std::endl;
+	//cudaMemcpy(M_host, M_device, g.size * g.size * sizeof(double), cudaMemcpyDeviceToHost);
+	//for(int i=0;i<g.size * g.size;i++){
+	//	std::cout<<"M "<<i<<":"<<M_host[i]<<std::endl;
+	//}
+
+
+	/* Section 6: Compute M'' = log(max(M,1)) */
+	
+	/* Procedure 
+	   1. Prune M and take log
+	   2. Create CSR struct for M''
+	   3. Compute nnzPerVector for M''
+	*/
+
+	/* Step 1: Prune M and take log */
+	log("Pruning M");
+
+	prune_m<<<grids,threads>>>(M_device, g.size);
+       	cudaDeviceSynchronize(); 
+
+	log("Pruned M");
+
+	/* Step 2: Create CSR struct for both matrices */
+	log("Converting dense matrix to CSR format");	
+	csr M_cap;    /* Variable to hold adjacency matrix in CSR format */
+
+	M_cap.nnz = 0; /* Initialize number of non zeros in adjacency matrix */
+
+	/* Step 6: Compute nnz/row of dense matrix */	
+	log("Computing nnzPerVector for M''");
+
+	cudaMalloc(&M_cap.d_nnzPerVector, 
+			g.size * sizeof(int));
+	cusparseDnnz(cusparse_handle, 
+			CUSPARSE_DIRECTION_ROW, 
+			g.size, g.size, 
+			mat_descr, 
+			M_device, LDA, 
+			M_cap.d_nnzPerVector, &M_cap.nnz);
+	M_cap.h_nnzPerVector = (int *)malloc(g.size * sizeof(int));
+	cudaMemcpy(M_cap.h_nnzPerVector, 
+			M_cap.d_nnzPerVector, 
+			g.size * sizeof(int), 
+			cudaMemcpyDeviceToHost); 
+	if(DEBUG){
+    		printf("Number of nonzero elements in dense adjacency matrix = %i\n", M_cap.nnz);
+    		
+		if(VERBOSE)
+		for (int i = 0; i < g.size; ++i) printf("Number of nonzero elements in row %i for matrix = %i \n", i, M_cap.h_nnzPerVector[i]);
+	}
+
+
+	/* Step 6: Convert dense matrix to sparse matrices */
+	allocate_csr(&M_cap, M_cap.nnz, g.size);
+	cusparseDdense2csr(cusparse_handle, 
+			g.size, g.size, 
+			mat_descr,
+		       	M_device,	
+			LDA, 
+			M_cap.d_nnzPerVector, 
+			M_cap.d_values, M_cap.d_rowIndices, M_cap.d_colIndices); 
+	if(VERBOSE){
+		device2host(&M_cap, M_cap.nnz, g.size);	
+		print_csr(
+    			g.size,
+    			M_cap.nnz,
+    			M_cap,
+    			"Adjacency matrix");
+	}
+
+	cudaFree(M_device);
+
+	device2host(&M_cap, M_cap.nnz, g.size);
+	log("Completed conversion of data from dense to sparse");
+
+	/* REMOVE*/
+	//for(int i=0;i<M_cap.nnz;i++){
+	//	std::cout<<"M_cap: "<<M_cap.h_values[i]<<std::endl;
+	//}
+
+	/* Section 7: Compute SVD of objective matrix */	
+
+	char whichS = 'L';
+	char whichV = 'L';
+
+	MKL_INT pm[128];
+	mkl_sparse_ee_init(pm);
+	//pm[1] = 100;
+	//pm[2] = 2;
+	//pm[4] = 60;
+
+	MKL_INT mkl_rows = g.size;
+	MKL_INT mkl_cols = g.size;
+
+
+	//MKL_INT rows_start[mkl_rows];
+	//MKL_INT rows_end[mkl_rows];
+
+	MKL_INT *rows_start;
+	MKL_INT *rows_end;
+
+	rows_start = (MKL_INT *)mkl_malloc(mkl_rows * sizeof(MKL_INT),64);
+	rows_end = (MKL_INT *)mkl_malloc(mkl_rows * sizeof(MKL_INT),64);
+
+	for(int i=0;i<mkl_rows;i++){
+		rows_start[i] = M_cap.h_rowIndices[i];
+		rows_end[i] = M_cap.h_rowIndices[i+1];
+	}
+	
+	//MKL_INT mkl_col_idx[M_cap.nnz];
+
+	MKL_INT *mkl_col_idx;
+	mkl_col_idx = (MKL_INT*)mkl_malloc(M_cap.nnz * sizeof(MKL_INT), 64);
+
+	int mkl_temp;
+	for(int i=0;i<M_cap.nnz;i++){
+		mkl_temp = M_cap.h_colIndices[i];
+		mkl_col_idx[i] = mkl_temp;
+	}
+
+
+	sparse_matrix_t M_mkl;
+	sparse_index_base_t indexing = SPARSE_INDEX_BASE_ZERO;
+
+	mkl_sparse_d_create_csr(&M_mkl, indexing,
+					mkl_rows, mkl_cols,
+					rows_start, rows_end,
+					mkl_col_idx, M_cap.h_values);
+
+	log("Created MKL sparse");
+
+	matrix_descr mkl_descrM;
+	mkl_descrM.type = SPARSE_MATRIX_TYPE_GENERAL;	
+	mkl_descrM.mode = SPARSE_FILL_MODE_UPPER;
+	mkl_descrM.diag = SPARSE_DIAG_NON_UNIT;
+
+	MKL_INT k0 = dimension;
+	MKL_INT k;
+
+	double *E_mkl, *K_L_mkl, *K_R_mkl, *res_mkl;
+
+	E_mkl = (double *)mkl_malloc(k0 * sizeof(double), 128);
+	K_L_mkl = (double *)mkl_malloc( k0*mkl_rows*sizeof( double), 128 );
+        K_R_mkl = (double *)mkl_malloc( k0*mkl_cols*sizeof( double), 128 );
+        res_mkl = (double *)mkl_malloc( k0*sizeof( double), 128 );
+
+	memset(E_mkl, 0 , k0);
+	memset(K_L_mkl, 0 , k0);
+	memset(K_R_mkl, 0 , k0);
+	memset(res_mkl, 0 , k0);
+
+	int mkl_status = 0;
+
+	log("Computing SVD via MKL");
+	mkl_status = mkl_sparse_d_svd(&whichS, &whichV, pm,
+			M_mkl, mkl_descrM,
+			k0, &k,
+			E_mkl,
+			K_L_mkl,
+			K_R_mkl,
+			res_mkl);
+	log("Computed SVD via MKL");
+
+	if(DEBUG){
+	std::cout<<"Number of singular found: "<<k<<std::endl;
+	for(int i=0;i<k0;i++){ std::cout<<E_mkl[i]<<" ";} std::cout<<"\n";
+	}
+
+	double *U_device, *Si_device;
+	double *U_host;
+	double *Si_host;
+	double *E_device, *E_host;
+
+	cudaMalloc(&U_device, g.size * dimension * sizeof(double));
+	cudaMalloc(&E_device, g.size * dimension * sizeof(double));
+	cudaMalloc(&Si_device, dimension * sizeof(double));
+
+	U_host = (double *) malloc(g.size * dimension * sizeof(double));
+	E_host = (double *) malloc(g.size * dimension * sizeof(double));
+	Si_host = (double *) malloc(dimension * sizeof(double));
+
+	cudaMemcpy(U_device, K_L_mkl, g.size * dimension * sizeof(double), cudaMemcpyHostToDevice);
+	cudaMemcpy(Si_device, E_mkl, dimension * sizeof(double), cudaMemcpyHostToDevice);
+
+	transform_si<<<grids,threads>>>(Si_device, dimension);
+
+	cudaMemcpy(Si_host, Si_device, dimension * sizeof(double), cudaMemcpyDeviceToHost);
+
+	std::cout<<"\n";
+	cublasDdgmm(cublas_handle, CUBLAS_SIDE_RIGHT,
+		g.size, dimension,
+		U_device, g.size, 
+		Si_device, 1.0,
+		E_device, g.size);
+
+	cudaMemcpy(E_host, E_device, g.size * dimension * sizeof(double), cudaMemcpyDeviceToHost);
+
+	write_embeddings("blogcatalog.emb",E_host, g.size, dimension);
+
+	mkl_free(rows_start);	
+	mkl_free(rows_end);	
+	mkl_free(mkl_col_idx);	
+
+	cudaDeviceReset();
 }

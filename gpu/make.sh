@@ -11,8 +11,9 @@ nvcc -o ../utils/graph.o -c ../utils/graph.cpp
 nvcc -o ../utils/io.o -c ../utils/io.cpp
 nvcc -o ../utils/utils.o -c ../utils/utils.cpp
 
-nvcc -g -O3 -o netmf_small_sparse_hybrid netmf_small_sparse_hybrid.cu $FLAGS
-nvcc -g -O3 -o netmf_small_dense_hybrid netmf_small_dense_hybrid.cu $FLAGS
+#nvcc -g -O0 -o netmf_small_sparse_hybrid netmf_small_sparse_hybrid.cu $FLAGS
+#nvcc -g -O0 -o netmf_small_dense_hybrid netmf_small_dense_hybrid.cu $FLAGS
+nvcc -g -O0 -o netmf_large_dense_hybrid netmf_large_dense_hybrid.cu $FLAGS
 
 #nvcc -g -O3 -o netmf_small_dense_unified_hybrid netmf_small_dense_unified_hybrid.cu $FLAGS
 

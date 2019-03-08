@@ -43,9 +43,9 @@ __global__ void preprocess_laplacian(double* adj, double *degree, int size){
 		
 	if(degree[id] == 0){
 			degree[id] = 1.00;
-			adj[id] = 1.00;	
+			adj[id*size + id] = 1.00;	
 	}else{
-			adj[id] = 0.0;
+			adj[id * size + id] = 0.0;
 	}	
 }
 __global__ void compute_d(double* deg, int size){
@@ -426,6 +426,9 @@ int main (int argc, char *argv[] ){
 			g.degree1D, 
 			g.size * sizeof(double), 
 			cudaMemcpyHostToDevice);
+
+	/*REMOVE*/
+	std::sort(g.degree1D,g.degree1D + g.size);
 
 	/*Step 4: Compute volume and preprocess degree */
 	preprocess_laplacian<<<grids,threads>>>(adj_device_dense, degree_device_dense, g.size);
