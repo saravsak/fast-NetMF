@@ -8,15 +8,18 @@
 #include<stdio.h>
 #include<cstring>
 #include <iostream>
+
+typedef double DT;
+
 class Graph
 {
 	public:
-		double *adj, *degree, *degree1D, volume;
+		DT *adj, *degree, *degree1D, volume;
 		int size;
-		float num_edges;
+		DT num_edges;
 		bool directed;
 		Graph(int);
-		void add_edge(int, int, double);
+		void add_edge(int, int, DT);
 		void print_degree();
 		void print_graph();
 		void info();

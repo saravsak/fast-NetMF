@@ -13,7 +13,7 @@ bool check_file(const char * fileName){
 	return infile.good();
 }
 
-void write_embeddings(const char * fileName, double *embeddings, int size, int dim){
+void write_embeddings(const char * fileName, DT *embeddings, int size, int dim){
 	// Assumes embeddings are stored in column major format
 	std::ofstream op;
 	op.open(fileName);

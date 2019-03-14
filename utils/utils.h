@@ -3,13 +3,15 @@
 #include<time.h>
 #include<chrono>
 
+#include "graph.h"
+
 typedef std::chrono::milliseconds milliseconds;
 
 struct info {
 	const char * dataset;
 	const char * algo;
-	double dimension;
-	double window_size;
+	DT dimension;
+	DT window_size;
 	milliseconds iptime;
 	milliseconds init;
 	milliseconds gpuio;
