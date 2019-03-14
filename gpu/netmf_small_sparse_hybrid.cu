@@ -33,7 +33,7 @@ void print_csr(
     std::cout<<"Cols: "; for(int i=0;i<nnz;i++) std::cout<<mat_csr.h_colIndices[i]<<" "; std::cout<<'\n';
     std::cout<<"Rows: "; for(int i=0;i<m+1;i++) std::cout<<mat_csr.h_rowIndices[i]<<" "; std::cout<<'\n';
 }
-__global__ void preprocess_laplacian(double* adj, double *degree, int size){
+__global__ void preprocess_laplacian(DT* adj, DT *degree, int size){
 	int id = blockIdx.x * blockDim.x + threadIdx.x;
 	
 	if(id >= size) return;
@@ -48,7 +48,7 @@ __global__ void preprocess_laplacian(double* adj, double *degree, int size){
 			adj[id*size + id] = 0.0;
 	}	
 }
-__global__ void compute_d(double* deg, int size){
+__global__ void compute_d(DT* deg, int size){
 	int id = blockIdx.x * blockDim.x + threadIdx.x;
 	
 	if(id >= size) return;
@@ -73,7 +73,7 @@ __global__ void compute_s(float* S, float* X, int size){
 	S[id] += X[id]; 
 }
 
-__global__ void transform_si(double* S, int size){
+__global__ void transform_si(DT* S, int size){
 	int id = blockIdx.x * blockDim.x + threadIdx.x;
 
 	if(id >= size) return;
@@ -81,17 +81,17 @@ __global__ void transform_si(double* S, int size){
 	S[id] = sqrt(S[id]); 
 }
 
-__global__ void transform_s(double* S, float val, int size){
+__global__ void transform_s(DT* S, float val, int size){
 	int id = blockIdx.x * blockDim.x + threadIdx.x;
 
 	if(id >= size) return;
 	
-	double mem = S[id];
+	DT mem = S[id];
 	
 	S[id] = mem * val; 
 }
 
-__global__ void prune_m(double* M, int size){
+__global__ void prune_m(DT* M, int size){
 	int id = blockIdx.x * blockDim.x + threadIdx.x;
 
 	if(id >= size) return;
@@ -104,7 +104,7 @@ __global__ void prune_m(double* M, int size){
 }
 
 
-__global__ void transform_m(double* M, int size){
+__global__ void transform_m(DT* M, int size){
 	int id = blockIdx.x * blockDim.x + threadIdx.x;
 
 	if(id >= size) return;
@@ -120,7 +120,7 @@ __global__ void sqrt_si(float* S, int size){
 	S[id] = sqrt((float) S[id]);
 }
 
-void print_matrix(double* S, int size){
+void print_matrix(DT* S, int size){
 	std::cout<<std::endl<<std::endl;
 	for(int i=0;i<size;i++){
 		for(int j=0;j<size;j++){
@@ -136,20 +136,20 @@ void allocate_csr_row(csr *csr_mat, int num_rows){
 
 }
 void allocate_csr_col_val(csr *csr_mat, int nnz){
-	csr_mat->h_values = (double *) malloc(nnz * sizeof(double));
+	csr_mat->h_values = (DT *) malloc(nnz * sizeof(DT));
 	csr_mat->h_colIndices = (int *) malloc(nnz * sizeof(int));
 
-	cudaMalloc(&csr_mat->d_values, nnz*sizeof(double));
+	cudaMalloc(&csr_mat->d_values, nnz*sizeof(DT));
 	cudaMalloc(&csr_mat->d_colIndices, nnz * sizeof(int));
 
 }
 
 void allocate_csr(csr *csr_mat, int nnz, int num_rows){
-	csr_mat->h_values = (double *) malloc(nnz * sizeof(double));
+	csr_mat->h_values = (DT *) malloc(nnz * sizeof(DT));
 	csr_mat->h_colIndices = (int *) malloc(nnz * sizeof(int));
 	csr_mat->h_rowIndices = (int *) malloc((num_rows+1) * sizeof(int));
 
-	cudaMalloc(&csr_mat->d_values, nnz*sizeof(double));
+	cudaMalloc(&csr_mat->d_values, nnz*sizeof(DT));
 	cudaMalloc(&csr_mat->d_colIndices, nnz * sizeof(int));
 	cudaMalloc(&csr_mat->d_rowIndices, (num_rows+1) * sizeof(int));
 
@@ -169,13 +169,13 @@ void copy_csr(csr *from_mat, csr *to_mat, int num_rows){
 	to_mat->nnz = from_mat->nnz;
 
 	/* Copy host variables */
-	memcpy(to_mat->h_values, from_mat->h_values, to_mat->nnz * sizeof(double));
+	memcpy(to_mat->h_values, from_mat->h_values, to_mat->nnz * sizeof(DT));
 	memcpy(to_mat->h_colIndices, from_mat->h_colIndices, to_mat->nnz * sizeof(int));
 	memcpy(to_mat->h_rowIndices, from_mat->h_rowIndices, (num_rows + 1) * sizeof(int));
 
 
 	/* Copy device variables */
-	cudaMemcpy(to_mat->d_values, from_mat->d_values, to_mat->nnz * sizeof(double), cudaMemcpyDeviceToDevice);
+	cudaMemcpy(to_mat->d_values, from_mat->d_values, to_mat->nnz * sizeof(DT), cudaMemcpyDeviceToDevice);
 	cudaMemcpy(to_mat->d_colIndices, from_mat->d_colIndices, to_mat->nnz * sizeof(int), cudaMemcpyDeviceToDevice);
 	cudaMemcpy(to_mat->d_rowIndices, from_mat->d_rowIndices, (num_rows + 1) * sizeof(int), cudaMemcpyDeviceToDevice);
 
@@ -183,7 +183,7 @@ void copy_csr(csr *from_mat, csr *to_mat, int num_rows){
 
 void device2host(csr *csr_mat, int nnz, int num_rows){
 	cudaMemcpy(csr_mat->h_values, csr_mat->d_values, 
-			nnz * sizeof(double), cudaMemcpyDeviceToHost);
+			nnz * sizeof(DT), cudaMemcpyDeviceToHost);
 	cudaMemcpy(csr_mat->h_colIndices, csr_mat->d_colIndices, 
 			nnz * sizeof(int), cudaMemcpyDeviceToHost);
 	cudaMemcpy(csr_mat->h_rowIndices, csr_mat->d_rowIndices, 
@@ -192,7 +192,7 @@ void device2host(csr *csr_mat, int nnz, int num_rows){
 
 void host2device(csr *csr_mat, int nnz, int num_rows){
 	cudaMemcpy(csr_mat->d_values, csr_mat->h_values, 
-			nnz * sizeof(double), cudaMemcpyHostToDevice);
+			nnz * sizeof(DT), cudaMemcpyHostToDevice);
 	cudaMemcpy(csr_mat->d_colIndices, csr_mat->h_colIndices, 
 			nnz * sizeof(int), cudaMemcpyHostToDevice);
 	cudaMemcpy(csr_mat->d_rowIndices, csr_mat->h_rowIndices, 
@@ -208,8 +208,8 @@ void add_csr(csr *A, csr *B, csr *C, int m, int n, cusparseHandle_t context,cusp
 	C->nnz = 0;
 	nnzTotalDevHostPtr = &C->nnz;
 
-	double alf = 1.0;
-	double bet = 1.0;
+	DT alf = 1.0;
+	DT bet = 1.0;
 
 	cusparseSetPointerMode(context, CUSPARSE_POINTER_MODE_HOST);
 	allocate_csr_row(C, m);
@@ -388,25 +388,25 @@ int main ( int argc, char** argv  ){
 	begin = Clock::now();
 	/* Step 1: Create dense adjacency matrix and degree matrixx on device */
 	log("Creating dense device array");
-	double *adj_device_dense;	
-	double *degree_device_dense; 
+	DT *adj_device_dense;	
+	DT *degree_device_dense; 
 
 	/* Step 2: Allocate space for adjacency and degree matrix on device */
 	log("Allocating space for dense mat on device");
 	cudaMalloc(&adj_device_dense, 
-			g.size * g.size * sizeof(double)); 	
+			g.size * g.size * sizeof(DT)); 	
 	cudaMalloc(&degree_device_dense, 
-			g.size * g.size * sizeof(double)); 
+			g.size * g.size * sizeof(DT)); 
 
 	/* Step 3: Copy dense matrix from host to device */
 	log("Copying dense matrix from host to device");	
 	cudaMemcpy(adj_device_dense, 
 			g.adj, 
-			g.size * g.size * sizeof(double), 
+			g.size * g.size * sizeof(DT), 
 			cudaMemcpyHostToDevice);	
 	cudaMemcpy(degree_device_dense, 
 			g.degree, 
-			g.size * g.size * sizeof(double), 
+			g.size * g.size * sizeof(DT), 
 			cudaMemcpyHostToDevice);
 
 	
@@ -497,7 +497,7 @@ int main ( int argc, char** argv  ){
 
 	if(DEBUG){
 		device2host(&degree_csr, degree_csr.nnz, g.size);	
-		double sum = 0;
+		DT sum = 0;
 		for(int i=0;i<degree_csr.nnz;i++)
 			sum+=degree_csr.h_values[i];
 		//int sum = std::accumulate(degree_csr.h_values, degree_csr.h_values + degree_csr.nnz);
@@ -673,7 +673,7 @@ int main ( int argc, char** argv  ){
 
 	log("Applying Transformation on S");
 	/* Step 1: Compute val = vol / (window_size * b) */
-	const double val = ((double) g.volume)/(((double) window_size) * ((double) b));
+	const DT val = ((DT) g.volume)/(((DT) window_size) * ((DT) b));
 
 	if(DEBUG){
 		std::cout<<"Mult value"<<val<<std::endl;
@@ -819,7 +819,7 @@ int main ( int argc, char** argv  ){
 	
 	/* Step 2: Compute buffersize */
 	log("Computing buffer size for pruning");
-	double threshold = 0.00;
+	DT threshold = 0.00;
 
 	csr M_cap;
 	allocate_csr_row(&M_cap, g.size);
@@ -946,12 +946,12 @@ int main ( int argc, char** argv  ){
 	MKL_INT k0 = dimension;
 	MKL_INT k;
 
-	double *E_mkl, *K_L_mkl, *K_R_mkl, *res_mkl;
+	DT *E_mkl, *K_L_mkl, *K_R_mkl, *res_mkl;
 
-	E_mkl = (double *)mkl_malloc(k0 * sizeof(double), 128);
-	K_L_mkl = (double *)mkl_malloc( k0*mkl_rows*sizeof( double), 128 );
-        K_R_mkl = (double *)mkl_malloc( k0*mkl_cols*sizeof( double), 128 );
-        res_mkl = (double *)mkl_malloc( k0*sizeof( double), 128 );
+	E_mkl = (DT *)mkl_malloc(k0 * sizeof(DT), 128);
+	K_L_mkl = (DT *)mkl_malloc( k0*mkl_rows*sizeof( DT), 128 );
+        K_R_mkl = (DT *)mkl_malloc( k0*mkl_cols*sizeof( DT), 128 );
+        res_mkl = (DT *)mkl_malloc( k0*sizeof( DT), 128 );
 
 	memset(E_mkl, 0 , k0);
 	memset(K_L_mkl, 0 , k0);
@@ -980,25 +980,25 @@ int main ( int argc, char** argv  ){
 	for(int i=0;i<k0;i++){ std::cout<<E_mkl[i]<<" ";} std::cout<<"\n";
 	}
 
-	double *U_device, *Si_device;
-	//double *U_host;
-	double *Si_host;
-	double *E_device, *E_host;
+	DT *U_device, *Si_device;
+	//DT *U_host;
+	DT *Si_host;
+	DT *E_device, *E_host;
 
-	cudaMalloc(&U_device, g.size * dimension * sizeof(double));
-	cudaMalloc(&E_device, g.size * dimension * sizeof(double));
-	cudaMalloc(&Si_device, dimension * sizeof(double));
+	cudaMalloc(&U_device, g.size * dimension * sizeof(DT));
+	cudaMalloc(&E_device, g.size * dimension * sizeof(DT));
+	cudaMalloc(&Si_device, dimension * sizeof(DT));
 
-	//U_host = (double *) malloc(g.size * dimension * sizeof(double));
-	E_host = (double *) malloc(g.size * dimension * sizeof(double));
-	Si_host = (double *) malloc(dimension * sizeof(double));
+	//U_host = (DT *) malloc(g.size * dimension * sizeof(DT));
+	E_host = (DT *) malloc(g.size * dimension * sizeof(DT));
+	Si_host = (DT *) malloc(dimension * sizeof(DT));
 
-	cudaMemcpy(U_device, K_L_mkl, g.size * dimension * sizeof(double), cudaMemcpyHostToDevice);
-	cudaMemcpy(Si_device, E_mkl, dimension * sizeof(double), cudaMemcpyHostToDevice);
+	cudaMemcpy(U_device, K_L_mkl, g.size * dimension * sizeof(DT), cudaMemcpyHostToDevice);
+	cudaMemcpy(Si_device, E_mkl, dimension * sizeof(DT), cudaMemcpyHostToDevice);
 
 	transform_si<<<grids,threads>>>(Si_device, dimension);
 
-	cudaMemcpy(Si_host, Si_device, dimension * sizeof(double), cudaMemcpyDeviceToHost);
+	cudaMemcpy(Si_host, Si_device, dimension * sizeof(DT), cudaMemcpyDeviceToHost);
 
 	std::cout<<"\n";
 	cublasDdgmm(cublas_handle, CUBLAS_SIDE_RIGHT,
@@ -1007,7 +1007,7 @@ int main ( int argc, char** argv  ){
 		Si_device, 1.0,
 		E_device, g.size);
 
-	cudaMemcpy(E_host, E_device, g.size * dimension * sizeof(double), cudaMemcpyDeviceToHost);
+	cudaMemcpy(E_host, E_device, g.size * dimension * sizeof(DT), cudaMemcpyDeviceToHost);
 
 	end = Clock::now();
 
