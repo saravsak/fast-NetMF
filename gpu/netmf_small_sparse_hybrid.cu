@@ -236,7 +236,7 @@ void add_csr(csr *A, csr *B, csr *C, int m, int n, cusparseHandle_t context,cusp
 
 	allocate_csr_col_val(C, C->nnz);	
 
-	cusparseDcsrgeam(context, m, n,
+	cusparseScsrgeam(context, m, n,
 			&alf,
 			descr, A->nnz,
 			A->d_values, A->d_rowIndices, A->d_colIndices,
@@ -289,7 +289,7 @@ void multiply_csr(csr *A, csr *B, csr *C, int m, int n, int k, cusparseHandle_t 
 
 	allocate_csr_col_val(C, C->nnz);	
 
-	cusparseDcsrgemm(context, 
+	cusparseScsrgemm(context, 
 			CUSPARSE_OPERATION_NON_TRANSPOSE, CUSPARSE_OPERATION_NON_TRANSPOSE,
 			m,n,k,
 			descr, A->nnz,
@@ -427,7 +427,7 @@ int main ( int argc, char** argv  ){
 
 	cudaMalloc(&adj_csr.d_nnzPerVector, 
 			g.size * sizeof(int));
-	cusparseDnnz(cusparse_handle, 
+	cusparseSnnz(cusparse_handle, 
 			CUSPARSE_DIRECTION_ROW, 
 			g.size, g.size, 
 			mat_descr, 
@@ -448,7 +448,7 @@ int main ( int argc, char** argv  ){
 	log("Computing nnzPerVector for D");
 	cudaMalloc(&degree_csr.d_nnzPerVector, 
 			g.size * sizeof(int));
-	cusparseDnnz(cusparse_handle, 
+	cusparseSnnz(cusparse_handle, 
 			CUSPARSE_DIRECTION_ROW, 
 			g.size, g.size, 
 			mat_descr, 
@@ -470,7 +470,7 @@ int main ( int argc, char** argv  ){
 
 	/* Step 6: Convert dense matrix to sparse matrices */
 	allocate_csr(&adj_csr, adj_csr.nnz, g.size);
-	cusparseDdense2csr(cusparse_handle, 
+	cusparseSdense2csr(cusparse_handle, 
 			g.size, g.size, 
 			mat_descr,
 		        adj_device_dense,	
@@ -487,7 +487,7 @@ int main ( int argc, char** argv  ){
 	}
 
 	allocate_csr(&degree_csr, degree_csr.nnz, g.size);
-	cusparseDdense2csr(cusparse_handle, 
+	cusparseSdense2csr(cusparse_handle, 
 			g.size, g.size, 
 			mat_descr, 
 			degree_device_dense,
@@ -683,7 +683,7 @@ int main ( int argc, char** argv  ){
 	/* Step 2: Compute S[i] = S[i] * val */
 
 		
-	cublasDscal(cublas_handle, S.nnz,
+	cublasSscal(cublas_handle, S.nnz,
                     &val,
                     S.d_values, 1);
 	cudaDeviceSynchronize();
@@ -825,7 +825,7 @@ int main ( int argc, char** argv  ){
 	allocate_csr_row(&M_cap, g.size);
 	size_t lworkInBytes = 0;
 	char *d_work=NULL;
-	cusparseDpruneCsr2csr_bufferSizeExt(cusparse_handle,
+	cusparseSpruneCsr2csr_bufferSizeExt(cusparse_handle,
         					g.size,g.size,
         					M.nnz, mat_descr,
         					M.d_values,M.d_rowIndices,M.d_colIndices,
@@ -841,7 +841,7 @@ int main ( int argc, char** argv  ){
 
 	/* Step 3: Compute NNZ */
 	log("Computing Number of non zeros for pruned matrix");
-	cusparseDpruneCsr2csrNnz(cusparse_handle,
+	cusparseSpruneCsr2csrNnz(cusparse_handle,
 					g.size,g.size,
         				M.nnz,mat_descr,
   					M.d_values,M.d_rowIndices,M.d_colIndices,
@@ -863,7 +863,7 @@ int main ( int argc, char** argv  ){
 	/* Step 4: Convert CSR matrix to CSR matrix */
 	
 	allocate_csr_col_val(&M_cap, M_cap.nnz);
-	cusparseDpruneCsr2csr(cusparse_handle,
+	cusparseSpruneCsr2csr(cusparse_handle,
    				g.size,g.size,
         			M.nnz, mat_descr,
         			M.d_values, M.d_rowIndices, M.d_colIndices,
@@ -931,7 +931,7 @@ int main ( int argc, char** argv  ){
 	sparse_matrix_t M_mkl;
 	sparse_index_base_t indexing = SPARSE_INDEX_BASE_ZERO;
 
-	mkl_sparse_d_create_csr(&M_mkl, indexing,
+	mkl_sparse_s_create_csr(&M_mkl, indexing,
 					mkl_rows, mkl_cols,
 					rows_start, rows_end,
 					mkl_col_idx, M_cap.h_values);
@@ -961,7 +961,7 @@ int main ( int argc, char** argv  ){
 	int mkl_status = 0;
 
 	log("Computing SVD via MKL");
-	mkl_status = mkl_sparse_d_svd(&whichS, &whichV, pm,
+	mkl_status = mkl_sparse_s_svd(&whichS, &whichV, pm,
 			M_mkl, mkl_descrM,
 			k0, &k,
 			E_mkl,
@@ -1001,7 +1001,7 @@ int main ( int argc, char** argv  ){
 	cudaMemcpy(Si_host, Si_device, dimension * sizeof(DT), cudaMemcpyDeviceToHost);
 
 	std::cout<<"\n";
-	cublasDdgmm(cublas_handle, CUBLAS_SIDE_RIGHT,
+	cublasSdgmm(cublas_handle, CUBLAS_SIDE_RIGHT,
 		g.size, dimension,
 		U_device, g.size, 
 		Si_device, 1.0,

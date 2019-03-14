@@ -235,7 +235,7 @@ void add_csr(csr *A, csr *B, csr *C, int m, int n, cusparseHandle_t context,cusp
 
 	allocate_csr_col_val(C, C->nnz);	
 
-	cusparseDcsrgeam(context, m, n,
+	cusparseScsrgeam(context, m, n,
 			&alf,
 			descr, A->nnz,
 			A->d_values, A->d_rowIndices, A->d_colIndices,
@@ -288,7 +288,7 @@ void multiply_csr(csr *A, csr *B, csr *C, int m, int n, int k, cusparseHandle_t 
 
 	allocate_csr_col_val(C, C->nnz);	
 
-	cusparseDcsrgemm(context, 
+	cusparseScsrgemm(context, 
 			CUSPARSE_OPERATION_NON_TRANSPOSE, CUSPARSE_OPERATION_NON_TRANSPOSE,
 			m,n,k,
 			descr, A->nnz,
@@ -463,7 +463,7 @@ int main (int argc, char *argv[] ){
 	cudaMalloc(&X_temp_device, g.size * g.size * sizeof(DT));
 	cudaMemset(X_temp_device, 0, g.size * g.size);
 
-	cublasDdgmm(cublas_handle, CUBLAS_SIDE_LEFT,
+	cublasSdgmm(cublas_handle, CUBLAS_SIDE_LEFT,
 		g.size, g.size,
 		adj_device_dense, g.size, 
 		degree_device_dense, 1,
@@ -478,7 +478,7 @@ int main (int argc, char *argv[] ){
 	cudaMalloc(&X_device, g.size * g.size * sizeof(DT));
 	cudaMemset(X_device, 0, g.size * g.size);
 
-	cublasDdgmm(cublas_handle, CUBLAS_SIDE_RIGHT,
+	cublasSdgmm(cublas_handle, CUBLAS_SIDE_RIGHT,
 		g.size, g.size,
 		X_temp_device, g.size, 
 		degree_device_dense, 1,
@@ -534,7 +534,7 @@ int main (int argc, char *argv[] ){
 		log("Computing W' = W * X");
 		cudaMemset(W_temp_device, 0, g.size * g.size);
 		beta = 0;
-		cublasDgemm(cublas_handle, 
+		cublasSgemm(cublas_handle, 
 				CUBLAS_OP_N, CUBLAS_OP_N,
 				g.size, g.size, g.size,
 				&alpha,
@@ -547,7 +547,7 @@ int main (int argc, char *argv[] ){
 		log("Computing S' = S + W'");
 		cudaMemset(S_temp_device, 0, g.size * g.size);
 		beta = 1;
-		cublasDgeam(cublas_handle,
+		cublasSgeam(cublas_handle,
 				CUBLAS_OP_N, CUBLAS_OP_N,
 				g.size, g.size,
 				&alpha,
@@ -588,7 +588,7 @@ int main (int argc, char *argv[] ){
 
 	/* Step 2: Compute S[i] = S[i] * val */
 
-	cublasDscal(cublas_handle, g.size * g.size,
+	cublasSscal(cublas_handle, g.size * g.size,
                     &val,
                     S_device, 1);
 
@@ -613,7 +613,7 @@ int main (int argc, char *argv[] ){
 
 	cudaMalloc(&M_temp_device, g.size * g.size * sizeof(DT));
 
-	cublasDdgmm(cublas_handle, CUBLAS_SIDE_LEFT,
+	cublasSdgmm(cublas_handle, CUBLAS_SIDE_LEFT,
 		g.size, g.size,
 		S_device, g.size, 
 		degree_device_dense, 1,
@@ -625,7 +625,7 @@ int main (int argc, char *argv[] ){
 	DT *M_device;
 	cudaMalloc(&M_device, g.size * g.size * sizeof(DT));
 
-	cublasDdgmm(cublas_handle, CUBLAS_SIDE_RIGHT,
+	cublasSdgmm(cublas_handle, CUBLAS_SIDE_RIGHT,
 		g.size, g.size,
 		M_temp_device, g.size, 
 		degree_device_dense, 1,
@@ -660,7 +660,7 @@ int main (int argc, char *argv[] ){
 
 	cudaMalloc(&M_cap.d_nnzPerVector, 
 			g.size * sizeof(int));
-	cusparseDnnz(cusparse_handle, 
+	cusparseSnnz(cusparse_handle, 
 			CUSPARSE_DIRECTION_ROW, 
 			g.size, g.size, 
 			mat_descr, 
@@ -681,7 +681,7 @@ int main (int argc, char *argv[] ){
 
 	/* Step 6: Convert dense matrix to sparse matrices */
 	allocate_csr(&M_cap, M_cap.nnz, g.size);
-	cusparseDdense2csr(cusparse_handle, 
+	cusparseSdense2csr(cusparse_handle, 
 			g.size, g.size, 
 			mat_descr,
 		       	M_device,	
@@ -750,7 +750,7 @@ int main (int argc, char *argv[] ){
 	sparse_matrix_t M_mkl;
 	sparse_index_base_t indexing = SPARSE_INDEX_BASE_ZERO;
 
-	mkl_sparse_d_create_csr(&M_mkl, indexing,
+	mkl_sparse_s_create_csr(&M_mkl, indexing,
 					mkl_rows, mkl_cols,
 					rows_start, rows_end,
 					mkl_col_idx, M_cap.h_values);
@@ -780,7 +780,7 @@ int main (int argc, char *argv[] ){
 	int mkl_status = 0;
 
 	log("Computing SVD via MKL");
-	mkl_status = mkl_sparse_d_svd(&whichS, &whichV, pm,
+	mkl_status = mkl_sparse_s_svd(&whichS, &whichV, pm,
 			M_mkl, mkl_descrM,
 			k0, &k,
 			E_mkl,
@@ -822,7 +822,7 @@ int main (int argc, char *argv[] ){
 	cudaMemcpy(Si_host, Si_device, dimension * sizeof(DT), cudaMemcpyDeviceToHost);
 
 	std::cout<<"\n";
-	cublasDdgmm(cublas_handle, CUBLAS_SIDE_RIGHT,
+	cublasSdgmm(cublas_handle, CUBLAS_SIDE_RIGHT,
 		g.size, dimension,
 		U_device, g.size, 
 		Si_device, 1.0,
