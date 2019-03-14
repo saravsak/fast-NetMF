@@ -8,7 +8,8 @@
 #include<cstring>
 #include <iostream>
 
-typedef double DT;
+//typedef double DT;
+typedef float DT;
 
 class Graph
 {
