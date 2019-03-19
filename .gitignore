@@ -30,4 +30,15 @@ CPU/.idea/
 CPU/embb_quality_check/
 CPU/netmf_sparse
 CPU/slurm*
+*.i
+*.ii
+*.gpu
+*.ptx
+*.cubin
+*.fatbin
+.*.swp
+data/
+lib/*
+embeddings/*
+mapping/*
 
