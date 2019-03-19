@@ -6,3 +6,6 @@
 *.fatbin
 .*.swp
 data/
+lib/*
+embeddings/*
+mapping/*
