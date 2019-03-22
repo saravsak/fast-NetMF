@@ -1,0 +1,8 @@
+#ifndef _CONSTANTS_H
+#define _CONSTANTS_H
+
+#define MODEL_STATUS_UNKNOWN 0
+#define MODEL_STATUS_FAST_HALS_CPU 1
+#define MODEL_STATUS_FAST_HALS_GPU 2
+
+#endif
