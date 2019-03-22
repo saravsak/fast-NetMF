@@ -305,9 +305,9 @@ void multiply_csr(csr *A, csr *B, csr *C, int m, int n, int k, cusparseHandle_t 
 }
 
 int main (int argc, char *argv[] ){
-	/**************
- 	* NetMF small *
-	**************/
+	/***********************
+ 	* NetMF small dense nmf*
+	***********************/
 	/* Argument order 
 	1. Dataset name
 	2. Window Size
@@ -317,13 +317,25 @@ int main (int argc, char *argv[] ){
 	6. Output
 	7. Mapping file
 	*/
+	
+	/* Setting args */
+	char *arg_dataset = argv[1];
+	char *arg_window = argv[2];
+	char *arg_dimension = argv[3];
+	char *arg_b = argv[4];
+	char *arg_input = argv[5];
+	char *arg_output = argv[6];
+	char *argv_mapping = argv[7];
+	char *argv_tile_size = argv[8];
+	char *argv_n_iters = argv[9];
+
 	typedef std::chrono::high_resolution_clock Clock;
 	typedef std::chrono::milliseconds milliseconds;
         Clock::time_point begin, end;
         Clock::time_point overall_begin, overall_end;
 	info profile; 
 	profile.dataset = argv[1];
-	profile.algo = "small-dense";
+	profile.algo = "small-dense-nmf";
 	/* Section 0: Preliminaries */
 
 	/* Settings */
@@ -655,18 +667,6 @@ int main (int argc, char *argv[] ){
 	DT *M_cap = (DT *) malloc(g.size * g.size * sizeof(DT));
 	cudaMemcpy(M_cap, M_device, g.size * g.size * sizeof(DT), cudaMemcpyDeviceToHost);
 
-	double *M_doub = (double *) malloc(g.size * g.size * sizeof(double));
-	for(int i=0;i<g.size * g.size;i++){
-		M_doub[i] = M_cap[i];
-	}
-
-	int nnz = 0;
-	for(int i=0;i<g.size * g.size;i++){
-		if(M_doub[i] !=0)
-			nnz++;
-	}
-
-	std::cout<<"Number of nnz in pruned M"<<nnz<<std::endl;
 
 	model nmf;
 
@@ -676,23 +676,44 @@ int main (int argc, char *argv[] ){
 	nmf_argv[0] = "-est_nmf_gpu";
 	log("Set Prameters");
 	nmf_argv[1] = "-K";
-	nmf_argv[2] = "128";
+	nmf_argv[2] = "80";
 	log("Set Prameters");
 	nmf_argv[3] = "-tile_size";
 	nmf_argv[4] = "10";
 	log("Set Prameters");
 	nmf_argv[5] = "-V";
-	sprintf(nmf_argv[6],"%d",g.size);
+	sprintf(nmf_argv[6], "%d", g.size);
 	log("Set Prameters");
 	nmf_argv[7] = "-D";
-	sprintf(nmf_argv[8],"%d",g.size);
+	sprintf(nmf_argv[8], "%d", g.size);
 	log("Set Prameters");
 	nmf_argv[9] = "-niters";
-	sprintf(nmf_argv[10],"%d",10);
+	nmf_argv[10] = "10";
 
 	log("Set Prameters");
+
+	int v = g.size;
+	int d = g.size;
+	double *M_doub = (double *) malloc(v * d * sizeof(double));
+
+
+	for(int i=0;i<v;i++){
+        	for(int j=0;j<d;j++){
+                	M_doub[i * d + j] = M_cap[i * d + j];
+        	}
+    	}
+
+	int nnz = 0;
+	for(int i=0;i<g.size * g.size;i++){
+		if(M_doub[i] !=0)
+			nnz++;
+	}
+
+	std::cout<<"Number of nnz in pruned M"<<nnz<<std::endl;
 
 	nmf.init(nmf_argc,nmf_argv);
 	nmf.estimate_HALS_GPU(M_doub);
+
+	write_embeddings(argv[6], nmf.DT, g.size, 80);	
 
 }

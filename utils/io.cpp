@@ -28,6 +28,21 @@ void write_embeddings(const char * fileName, DT *embeddings, int size, int dim){
 	op.close();
 
 }
+void write_embeddings(const char * fileName, double **embeddings, int size, int dim){
+	// Assumes embeddings are stored in column major format
+	std::ofstream op;
+	op.open(fileName);
+	op<<size<<" "<<dim<<std::endl;
+	for(int j=0;j<size;j++){
+		op << j << " ";
+		for(int i=0;i<dim;i++){
+			op << embeddings[i][j] << " ";	
+		}
+		op<<std::endl;
+	}
+	op.close();
+
+}
 void write_profile(const char * fileName, info profile){
 	std::ofstream op;
 	double tot = profile.iptime.count()
