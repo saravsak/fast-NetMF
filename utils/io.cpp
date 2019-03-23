@@ -83,26 +83,82 @@ void write_profile(const char * fileName, info profile){
 Graph read_graph(std::string filename, std::string format, const char *mapping_filename){
 	// TODO: Add check for unknown graph format
 
-	if(!format.compare("metis"))
-		return read_graph_from_metis(filename);
 
-	if(!format.compare("mat"))
-		return read_graph_from_mat(filename);
+	if(!format.compare("dense"))
+		return read_graph_from_dense(filename);
 
 	if(!format.compare("edgelist"))
 		return read_graph_from_edgelist(filename, mapping_filename);
 }
 
-Graph read_graph_from_metis(std::string filename){
-	/* TODO: Placeholder functions */
-	Graph G(4);
-	return G;
-}
+Graph read_graph_from_dense(std::string filename){
+	std::string line;
 
-Graph read_graph_from_mat(std::string filename){
-	/* TODO: Placeholder functions */
-	Graph G(4);
-	return G;
+	std::ifstream metaFile;
+	std::string metaFilename = filename + "meta.bin";
+	metaFile.open(metaFilename);
+
+	int num_nodes;
+	int num_edges;
+	int volume;
+
+	metaFile >> line;
+
+	std::string temp;
+	std::stringstream stream(line);
+
+	getline(stream,temp, ',');
+	num_nodes = stoi(temp);
+	
+	getline(stream,temp, ',');
+	num_edges = stoi(temp);
+	
+	getline(stream,temp, ',');
+	volume = stoi(temp);
+	
+	std::ifstream adjFile;
+	std::string adjFilename = filename + "adj.bin";
+	adjFile.open(adjFilename);
+	
+	Graph g(num_nodes);
+
+	g.volume = volume;
+
+	int source;
+	int target;
+	int weight;
+	
+	while(adjFile>>line){
+		std::stringstream st(line);
+		
+		getline(st, temp, ',');
+		source = stoi(temp);
+
+		getline(st, temp, ',');
+		target = stoi(temp);
+
+		getline(st, temp, ',');
+		weight = stof(temp);
+
+		g.adj[source * num_nodes + target] = weight;
+	}
+
+	std::ifstream degFile;
+	std::string degFilename = filename + "degree.bin";
+	degFile.open(degFilename);
+
+	while(degFile >> line){
+		std::stringstream st(line);
+	
+		int i=0;	
+		while(getline(st, temp, ',')){
+			g.degree[i] = stof(temp);
+			i++;
+		}
+
+	}	
+
+	return g;
 }
 
 Graph read_graph_from_edgelist(std::string filename, const char *mapping_filename){

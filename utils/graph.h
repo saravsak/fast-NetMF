@@ -11,12 +11,32 @@
 //typedef double DT;
 typedef float DT;
 
+struct csr{
+	// Device variables
+	DT *d_values;
+	int *d_rowIndices;
+	int *d_colIndices;
+	int *d_nnzPerVector;
+
+	// Host variables
+	DT *h_values;
+	int *h_rowIndices;
+	int *h_colIndices;
+	int *h_nnzPerVector;
+	int nnz;
+	int lda;
+};
+
 class Graph
 {
 	public:
-		DT *adj, *degree, *degree1D, volume;
 		int size;
-		DT num_edges;
+		int num_edges;
+		DT volume;
+
+		// Dense
+		DT *adj, *degree;
+				
 		bool directed;
 		Graph(int);
 		void add_edge(int, int, DT);

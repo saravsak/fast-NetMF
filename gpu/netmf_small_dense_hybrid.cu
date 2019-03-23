@@ -21,6 +21,16 @@
 #define DEBUG true
 #define VERBOSE false
 
+#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
+
+inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
+{
+   if (code != cudaSuccess) 
+   {
+      fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+      if (abort) exit(code);
+   }
+}
 
 void print_csr(
     int m,
@@ -335,7 +345,7 @@ int main (int argc, char *argv[] ){
         log("Reading data from file");
 	
 	begin = Clock::now(); 
-	Graph g =  read_graph(argv[5],"edgelist", argv[7]);
+	Graph g =  read_graph(argv[5],"dense", argv[7]);
 	end = Clock::now();
 
 	profile.iptime = std::chrono::duration_cast<milliseconds>(end - begin);
@@ -402,13 +412,13 @@ int main (int argc, char *argv[] ){
 			g.size * g.size * sizeof(DT), 
 			cudaMemcpyHostToDevice);	
 	cudaMemcpy(degree_device_dense, 
-			g.degree1D, 
+			g.degree, 
 			g.size * sizeof(DT), 
 			cudaMemcpyHostToDevice);
 
 
 	/*Step 4: Compute volume and preprocess degree */
-	preprocess_laplacian<<<grids,threads>>>(adj_device_dense, degree_device_dense, g.size);
+	//preprocess_laplacian<<<grids,threads>>>(adj_device_dense, degree_device_dense, g.size);
 	end = Clock::now();
 	profile.gpuio = std::chrono::duration_cast<milliseconds>(end - begin);
 
@@ -425,7 +435,16 @@ int main (int argc, char *argv[] ){
 	/* Step 1: Compute D' = D^{-1/2} */
 	log("Computing normalized D");
 	compute_d<<<grids, threads>>>(degree_device_dense, g.size);
+	gpuErrchk(cudaPeekAtLastError());
 	cudaDeviceSynchronize();
+
+	//if(DEBUG){
+	//	cudaMemcpy(g.degree, degree_device_dense, g.size * sizeof(DT), cudaMemcpyDeviceToHost);
+	//	for(int i=0;i<g.size;i++){
+	//		std::cout<<g.degree[i]<<" ";
+	//	}
+	//}
+
 	end = Clock::now();
 	profile.compute_d = std::chrono::duration_cast<milliseconds>(end - begin);
 

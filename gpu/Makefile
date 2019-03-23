@@ -2,7 +2,7 @@ CXX=icc
 CXXFLAGS=-O3 -march=native -std=c++11 -fPIC
 
 NVCC=nvcc
-NVCCFLAGS += -O3 -w -arch=sm_60 --std=c++11 -m64 -rdc=true -Xptxas -dlcm=ca -Xcompiler -fopenmp -lineinfo 
+NVCCFLAGS += -O3 -w -arch=sm_70 --std=c++11 -m64 -rdc=true -Xptxas -dlcm=ca -Xcompiler -fopenmp -lineinfo -G -g
 NVCCLINKFLAGS= -lcublas -lcusolver -lcusparse -lcudart
 
 MKLROOT = ~/intel/compilers_and_libraries_2019.3.199/linux/mkl

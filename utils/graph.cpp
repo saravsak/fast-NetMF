@@ -11,15 +11,13 @@
 Graph::Graph(int N )
 {
 	this->adj = (DT*) malloc (N * N * sizeof(DT));
-	this->degree = (DT*) malloc (N * N * sizeof(DT));
-	this->degree1D = (DT*) malloc (N * sizeof(DT));
+	this->degree = (DT*) malloc (N * sizeof(DT));
 	
 	this->size = N;
 	this->directed = false; // Always false, since NetMF assumes undirected graphs 
 
 	memset(this->adj, 0, N*N*sizeof(DT));
-	memset(this->degree, 0, N*N*sizeof(DT));
-	memset(this->degree1D, 0, N*sizeof(DT));
+	memset(this->degree, 0, N*sizeof(DT));
 
 	this->volume = 0;
 	//for(int i=0; i < this->size; i++)
@@ -45,7 +43,7 @@ void Graph::add_edge(int i, int j, DT weight=1.0)
 			this->volume += weight;
 			if(i!=j){
 				this->degree[i * this->size + i] += weight;
-				this->degree1D[i] += weight;
+				//this->degree1D[i] += weight;
 			}
 		}
 		//if(this->degree[i * this->size + i] == -1)
