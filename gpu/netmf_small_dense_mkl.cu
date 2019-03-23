@@ -321,7 +321,7 @@ int main(int argc, char *argv[]){
 	int idx = 0;
 	#pragma omp parallel
 	{
-		#pragma omp for collapse(2)
+		#pragma omp for
 		for(int i=0;i<rows;i++){
 			rows_start[i] = idx;
 			for(int j=0;j<cols;j++){

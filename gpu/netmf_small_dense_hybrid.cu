@@ -334,28 +334,11 @@ int main (int argc, char *argv[] ){
 	/* Load graph */
         log("Reading data from file");
 	
-	//Graph g =  read_graph("../data/test/small_test.csv","edgelist");
-	Graph g =  read_graph(argv[5],"edgelist", argv[7]);
 	begin = Clock::now(); 
-	//Graph g =  read_graph("../../nrl-data/wikipedia.edgelist","edgelist");
+	Graph g =  read_graph(argv[5],"edgelist", argv[7]);
 	end = Clock::now();
 
 	profile.iptime = std::chrono::duration_cast<milliseconds>(end - begin);
-
-	if(DEBUG){
-		if(VERBOSE){
-			log("Printing adj matrix");
-			print_matrix(g.adj, g.size);
-		}
-	}	
-	
-	log("Printing degree matrix");
-	if(DEBUG){
-		if(VERBOSE){
-			print_matrix(g.degree, g.size);
-		}
-	}
-
 
 	/* CUDA housekeeping */
 	begin = Clock::now();
@@ -401,8 +384,6 @@ int main (int argc, char *argv[] ){
 	log("Creating dense device array");
 	DT *adj_device_dense;	
 	DT *degree_device_dense; 
-	//DT *adj_host_dense;	
-	//DT *degree_host_dense; 
 
 	/* Step 2a: Allocate space for adjacency and degree matrix on device*/
 	log("Allocating space for degree and adjacency mat on device");
@@ -413,8 +394,6 @@ int main (int argc, char *argv[] ){
 
 	/* Step 2a: Allocate space for adjacency and degree matrix on host */
 	log("Allocating space for degree and adjacency matrix on host");
-	//adj_host_dense = (DT *) malloc(g.size * g.size * sizeof(DT));
-	//degree_host_dense = (DT *) malloc(g.size * sizeof(DT));
 
 	/* Step 3: Copy dense matrix from host to device */
 	log("Copying dense matrix from host to device");	
@@ -427,8 +406,6 @@ int main (int argc, char *argv[] ){
 			g.size * sizeof(DT), 
 			cudaMemcpyHostToDevice);
 
-	/*REMOVE*/
-	std::sort(g.degree1D,g.degree1D + g.size);
 
 	/*Step 4: Compute volume and preprocess degree */
 	preprocess_laplacian<<<grids,threads>>>(adj_device_dense, degree_device_dense, g.size);
@@ -671,13 +648,6 @@ int main (int argc, char *argv[] ){
 			M_cap.d_nnzPerVector, 
 			g.size * sizeof(int), 
 			cudaMemcpyDeviceToHost); 
-	if(DEBUG){
-    		printf("Number of nonzero elements in dense adjacency matrix = %i\n", M_cap.nnz);
-    		
-		if(VERBOSE)
-		for (int i = 0; i < g.size; ++i) printf("Number of nonzero elements in row %i for matrix = %i \n", i, M_cap.h_nnzPerVector[i]);
-	}
-
 
 	/* Step 6: Convert dense matrix to sparse matrices */
 	allocate_csr(&M_cap, M_cap.nnz, g.size);
@@ -688,14 +658,14 @@ int main (int argc, char *argv[] ){
 			LDA, 
 			M_cap.d_nnzPerVector, 
 			M_cap.d_values, M_cap.d_rowIndices, M_cap.d_colIndices); 
-	if(VERBOSE){
-		device2host(&M_cap, M_cap.nnz, g.size);	
-		print_csr(
-    			g.size,
-    			M_cap.nnz,
-    			M_cap,
-    			"Adjacency matrix");
-	}
+//	if(VERBOSE){
+//		device2host(&M_cap, M_cap.nnz, g.size);	
+//		print_csr(
+//    			g.size,
+//    			M_cap.nnz,
+//    			M_cap,
+//    			"Adjacency matrix");
+//	}
 
 	cudaFree(M_device);
 
