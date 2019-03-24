@@ -36,9 +36,13 @@ class Graph
 
 		// Dense
 		DT *adj, *degree;
-				
+		
+		// Sparse
+		csr adj_csr, degree_csr;	
+			
 		bool directed;
 		Graph(int);
+		Graph(int, int);
 		void add_edge(int, int, DT);
 		void print_degree();
 		void print_graph();

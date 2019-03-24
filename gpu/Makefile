@@ -1,5 +1,5 @@
 CXX=icc
-CXXFLAGS=-O3 -march=native -std=c++11 -fPIC
+CXXFLAGS=-O3 -g -march=native -std=c++11 -fPIC
 
 NVCC=nvcc
 NVCCFLAGS += -O3 -w -arch=sm_70 --std=c++11 -m64 -rdc=true -Xptxas -dlcm=ca -Xcompiler -fopenmp -lineinfo -G -g

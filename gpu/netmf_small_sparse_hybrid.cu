@@ -325,27 +325,20 @@ int main ( int argc, char** argv  ){
 	/* Load graph */
         log("Reading data from file");
 	
-	//Graph g =  read_graph("../data/test/small_test.csv","edgelist");
-	Graph g =  read_graph(argv[5],"edgelist", argv[7]);
 	begin = Clock::now(); 
-	//Graph g =  read_graph("../../nrl-data/wikipedia.edgelist","edgelist");
+	Graph g =  read_graph(argv[5],"csr", argv[7]);
+
+	cudaMalloc(&g.degree_csr.d_rowIndices, (g.size + 1) * sizeof(int));
+	cudaMalloc(&g.degree_csr.d_colIndices, (g.degree_csr.nnz) * sizeof(int));
+	cudaMalloc(&g.degree_csr.d_values, (g.degree_csr.nnz) * sizeof(DT));
+
+	cudaMalloc(&g.adj_csr.d_rowIndices, (g.size + 1) * sizeof(int));
+	cudaMalloc(&g.adj_csr.d_colIndices, (g.adj_csr.nnz) * sizeof(int));
+	cudaMalloc(&g.adj_csr.d_values, (g.adj_csr.nnz) * sizeof(DT));
+
 	end = Clock::now();
 
 	profile.iptime = std::chrono::duration_cast<milliseconds>(end - begin);
-	
-	if(DEBUG){
-		if(VERBOSE){
-			log("Printing adj matrix");
-			print_matrix(g.adj, g.size);
-		}
-	}	
-	
-	log("Printing degree matrix");
-	if(DEBUG){
-		if(VERBOSE){
-			print_matrix(g.degree, g.size);
-		}
-	}
 
 	begin = Clock::now();
 	/* CUDA housekeeping */
@@ -373,140 +366,25 @@ int main ( int argc, char** argv  ){
 	end = Clock::now();
 	profile.init = std::chrono::duration_cast<milliseconds>(end - begin);
 
-	/* Section 1. Convert graph to sparse */	
+	host2device(&g.degree_csr, g.degree_csr.nnz, g.size);
+	host2device(&g.adj_csr, g.adj_csr.nnz, g.size);
 
-	/* Procedure 
-	   1. Create dense adjacency and degree matrix on device
-	   2. Allocate space for adjacency and degree matrix on device
-	   3. Copy dense matrix from host to device
-	   4. Preprocess degree and adjacency matrix for laplacian computation
-	   5. Create CSR data structure for both matrices
-	   6. Compute nnz/row of dense matrix
-	   7. Apply Dense2CSR
-	 */
-
-	begin = Clock::now();
-	/* Step 1: Create dense adjacency matrix and degree matrixx on device */
-	log("Creating dense device array");
-	DT *adj_device_dense;	
-	DT *degree_device_dense; 
-
-	/* Step 2: Allocate space for adjacency and degree matrix on device */
-	log("Allocating space for dense mat on device");
-	cudaMalloc(&adj_device_dense, 
-			g.size * g.size * sizeof(DT)); 	
-	cudaMalloc(&degree_device_dense, 
-			g.size * g.size * sizeof(DT)); 
-
-	/* Step 3: Copy dense matrix from host to device */
-	log("Copying dense matrix from host to device");	
-	cudaMemcpy(adj_device_dense, 
-			g.adj, 
-			g.size * g.size * sizeof(DT), 
-			cudaMemcpyHostToDevice);	
-	cudaMemcpy(degree_device_dense, 
-			g.degree, 
-			g.size * g.size * sizeof(DT), 
-			cudaMemcpyHostToDevice);
-
+	if(DEBUG){
+		device2host(&g.degree_csr, g.degree_csr.nnz, g.size);	
+		device2host(&g.adj_csr, g.adj_csr.nnz, g.size);	
 	
-
-	/*Step 4: Compute volume and preprocess degree */
-	preprocess_laplacian<<<grids,threads>>>(adj_device_dense, degree_device_dense, g.size);
-
-	/* Step 5: Create CSR struct for both matrices */
-	log("Converting dense matrix to CSR format");	
-	csr adj_csr,    /* Variable to hold adjacency matrix in CSR format */
-	    degree_csr; /* Variable to hold degree matrix in CSR format */
-
-	adj_csr.nnz = 0; /* Initialize number of non zeros in adjacency matrix */
-	degree_csr.nnz = 0; /* Initialize number of non zeros in degree matrix */
-
-	/* Step 6: Compute nnz/row of dense matrix */	
-	log("Computing nnzPerVector for A");
-
-	cudaMalloc(&adj_csr.d_nnzPerVector, 
-			g.size * sizeof(int));
-	cusparseSnnz(cusparse_handle, 
-			CUSPARSE_DIRECTION_ROW, 
-			g.size, g.size, 
-			mat_descr, 
-			adj_device_dense, LDA, 
-			adj_csr.d_nnzPerVector, &adj_csr.nnz);
-	adj_csr.h_nnzPerVector = (int *)malloc(g.size * sizeof(int));
-	cudaMemcpy(adj_csr.h_nnzPerVector, 
-			adj_csr.d_nnzPerVector, 
-			g.size * sizeof(int), 
-			cudaMemcpyDeviceToHost); 
-	if(DEBUG){
-    		printf("Number of nonzero elements in dense adjacency matrix = %i\n", adj_csr.nnz);
-    		
-		if(VERBOSE)
-		for (int i = 0; i < g.size; ++i) printf("Number of nonzero elements in row %i for matrix = %i \n", i, adj_csr.h_nnzPerVector[i]);
-	}
-
-	log("Computing nnzPerVector for D");
-	cudaMalloc(&degree_csr.d_nnzPerVector, 
-			g.size * sizeof(int));
-	cusparseSnnz(cusparse_handle, 
-			CUSPARSE_DIRECTION_ROW, 
-			g.size, g.size, 
-			mat_descr, 
-			degree_device_dense, LDA, 
-			degree_csr.d_nnzPerVector, &degree_csr.nnz);
-	degree_csr.h_nnzPerVector = (int *)malloc(g.size * sizeof(int));
-	cudaMemcpy(degree_csr.h_nnzPerVector, 
-			degree_csr.d_nnzPerVector, 
-			g.size * sizeof(int), 
-			cudaMemcpyDeviceToHost);
-
-
-	if(DEBUG){
-    		printf("Number of nonzero elements in dense degree matrix = %i\n", degree_csr.nnz);
-    		if(VERBOSE)
-		for (int i = 0; i < g.size; ++i) printf("Number of nonzero elements in row %i for matrix = %i \n", i, degree_csr.h_nnzPerVector[i]);
-	}
-
-
-	/* Step 6: Convert dense matrix to sparse matrices */
-	allocate_csr(&adj_csr, adj_csr.nnz, g.size);
-	cusparseSdense2csr(cusparse_handle, 
-			g.size, g.size, 
-			mat_descr,
-		        adj_device_dense,	
-			LDA, 
-			adj_csr.d_nnzPerVector, 
-			adj_csr.d_values, adj_csr.d_rowIndices, adj_csr.d_colIndices); 
-	if(VERBOSE){
-		device2host(&adj_csr, adj_csr.nnz, g.size);	
-		print_csr(
-    			g.size,
-    			adj_csr.nnz,
-    			adj_csr,
-    			"Adjacency matrix");
-	}
-
-	allocate_csr(&degree_csr, degree_csr.nnz, g.size);
-	cusparseSdense2csr(cusparse_handle, 
-			g.size, g.size, 
-			mat_descr, 
-			degree_device_dense,
-			LDA, 
-			degree_csr.d_nnzPerVector, 
-			degree_csr.d_values, degree_csr.d_rowIndices, degree_csr.d_colIndices); 
-
-	if(DEBUG){
-		device2host(&degree_csr, degree_csr.nnz, g.size);	
+		std::cout<<"Sample"<<g.adj_csr.h_values[0];	
+	
 		DT sum = 0;
-		for(int i=0;i<degree_csr.nnz;i++)
-			sum+=degree_csr.h_values[i];
-		//int sum = std::accumulate(degree_csr.h_values, degree_csr.h_values + degree_csr.nnz);
+		for(int i=0;i<g.degree_csr.nnz;i++)
+			sum+=g.degree_csr.h_values[i];
+		//int sum = std::accumulate(g.degree_csr.h_values, g.degree_csr.h_values + g.degree_csr.nnz);
 		std::cout<<"Sum: "<<sum<<std::endl;
 		if(VERBOSE){
 			print_csr(
     				g.size,
-    				degree_csr.nnz,
-    				degree_csr,
+    				g.degree_csr.nnz,
+    				g.degree_csr,
     				"Degree matrix");
 		}
 	}
@@ -525,7 +403,7 @@ int main ( int argc, char** argv  ){
 	/* Step 1: Compute D' = D^{-1/2} */
 	begin = Clock::now();
 	log("Computing normalized D");
-	compute_d<<<grids, threads>>>(degree_csr.d_values, degree_csr.nnz);
+	compute_d<<<grids, threads>>>(g.degree_csr.d_values, g.degree_csr.nnz);
 	cudaDeviceSynchronize();
 	end = Clock::now();
 	profile.init = std::chrono::duration_cast<milliseconds>(end - begin);
@@ -533,20 +411,20 @@ int main ( int argc, char** argv  ){
 
 	log("Computed normalized D");
 	if(DEBUG){
-		device2host(&degree_csr, degree_csr.nnz, g.size);
-		int sum = 0;
+		device2host(&g.degree_csr, g.degree_csr.nnz, g.size);
+		float sum = 0;
 
-		for(int i=0;i<degree_csr.nnz;i++)
-			sum+=degree_csr.h_values[i];
+		for(int i=0;i<g.degree_csr.nnz;i++)
+			sum+=g.degree_csr.h_values[i];
 
 		std::cout<<"Sum of normalized degree matrix"<<sum<<std::endl;
 
-		std::sort(degree_csr.h_values, degree_csr.h_values + degree_csr.nnz);
+		std::sort(g.degree_csr.h_values, g.degree_csr.h_values + g.degree_csr.nnz);
 		if(VERBOSE){
 			print_csr(
 				g.size,
-				degree_csr.nnz,
-				degree_csr,
+				g.degree_csr.nnz,
+				g.degree_csr,
 				"Normalized Degree Matrix");
 		}
 	}
@@ -555,10 +433,25 @@ int main ( int argc, char** argv  ){
 	/* Step 2: Compute X' = D' * A */
 	log("Computing X' = D' * A");
 	csr X_temp;
-	multiply_csr(&degree_csr, &adj_csr, &X_temp, g.size, g.size, g.size, cusparse_handle, mat_descr);
+	multiply_csr(&g.degree_csr, &g.adj_csr, &X_temp, g.size, g.size, g.size, cusparse_handle, mat_descr);
 	
 	if(DEBUG){
 		device2host(&X_temp, X_temp.nnz, g.size);
+
+		int nz = 0;
+		int nnz = 0;
+		
+		for(int i=0;i<X_temp.nnz;i++){
+			if(X_temp.h_values[i] == 0)
+				nz +=1;
+			else
+				nnz +=1;
+		}	
+		std::cout<<"# zeros: "<<nz<<std::endl;
+		std::cout<<"# nonzeros: "<<nnz<<std::endl;
+
+		
+
 		if(VERBOSE)
 		{	print_csr(g.size, X_temp.nnz, X_temp, "X' = D' * A");}
 	}
@@ -567,7 +460,7 @@ int main ( int argc, char** argv  ){
 	/* Step 3: Compute X = X' * D */
 	log("Computing X = X' * D");
 	csr X;
-	multiply_csr(&X_temp, &degree_csr, &X, g.size, g.size, g.size, cusparse_handle, mat_descr);
+	multiply_csr(&X_temp, &g.degree_csr, &X, g.size, g.size, g.size, cusparse_handle, mat_descr);
 	
 	if(DEBUG){
 		device2host(&X, X.nnz, g.size);
@@ -717,7 +610,7 @@ int main ( int argc, char** argv  ){
 	/* Step 1: Compute M' = D' * S */
 	log("Computing M' = D' * S");
 	csr M_;
-	multiply_csr(&degree_csr, &S, &M_, g.size, g.size, g.size, cusparse_handle, mat_descr);
+	multiply_csr(&g.degree_csr, &S, &M_, g.size, g.size, g.size, cusparse_handle, mat_descr);
 	
 	if(DEBUG){
 		device2host(&M_, M_.nnz, g.size);
@@ -729,7 +622,7 @@ int main ( int argc, char** argv  ){
 	/* Step 3: Compute X = X' * D' */
 	log("Computing M = M' * D");
 	csr M;
-	multiply_csr(&M_, &degree_csr, &M, g.size, g.size, g.size, cusparse_handle, mat_descr);
+	multiply_csr(&M_, &g.degree_csr, &M, g.size, g.size, g.size, cusparse_handle, mat_descr);
 	
 	if(DEBUG){
 		device2host(&M, M.nnz, g.size);
@@ -944,7 +837,7 @@ int main ( int argc, char** argv  ){
 	mkl_descrM.diag = SPARSE_DIAG_NON_UNIT;
 
 	MKL_INT k0 = dimension;
-	MKL_INT k;
+	MKL_INT k = 0;
 
 	DT *E_mkl, *K_L_mkl, *K_R_mkl, *res_mkl;
 
@@ -953,10 +846,10 @@ int main ( int argc, char** argv  ){
         K_R_mkl = (DT *)mkl_malloc( k0*mkl_cols*sizeof( DT), 128 );
         res_mkl = (DT *)mkl_malloc( k0*sizeof( DT), 128 );
 
-	memset(E_mkl, 0 , k0);
-	memset(K_L_mkl, 0 , k0);
-	memset(K_R_mkl, 0 , k0);
-	memset(res_mkl, 0 , k0);
+	memset(E_mkl, 0 , k0 * sizeof(DT));
+	memset(K_L_mkl, 0 , k0 * sizeof(DT));
+	memset(K_R_mkl, 0 , k0 * sizeof(DT));
+	memset(res_mkl, 0 , k0 * sizeof(DT));
 
 	int mkl_status = 0;
 
@@ -971,7 +864,7 @@ int main ( int argc, char** argv  ){
 	log("Computed SVD via MKL");
 
 	if(mkl_status){
-		std::cout<<"SVD failed"<<std::endl;
+		std::cout<<"SVD failed "<<mkl_status<<std::endl;
 		exit(0);	
 	}
 
