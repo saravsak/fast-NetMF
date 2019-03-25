@@ -6,6 +6,7 @@
 #include<numeric>
 #include<math.h>
 #include<string.h>
+#include <sstream>
 
 #include<cuda_runtime.h>
 #include<cublas_v2.h>
@@ -21,7 +22,7 @@
 #include<mkl_solvers_ee.h>
 #include<mkl_spblas.h>
 
-#define DEBUG true
+#define DEBUG false
 #define VERBOSE false
 
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
@@ -631,15 +632,15 @@ int main (int argc, char *argv[] ){
 
 	cudaFree(M_temp_device);
 
-        if(DEBUG){
-		DT *M_host;
-		M_host = (DT *)malloc(g.size * g.size * sizeof(DT));
-		cudaMemcpy(M_host, M_device, g.size * g.size * sizeof(DT), cudaMemcpyDeviceToHost);
-		
-		for(int i=0;i<g.size * g.size;i++) std::cout<<M_host[i]<<" ";
-		std::cout<<"\n";
+        //if(DEBUG){
+	//	DT *M_host;
+	//	M_host = (DT *)malloc(g.size * g.size * sizeof(DT));
+	//	cudaMemcpy(M_host, M_device, g.size * g.size * sizeof(DT), cudaMemcpyDeviceToHost);
+	//	
+	//	for(int i=0;i<g.size * g.size;i++) std::cout<<M_host[i]<<" ";
+	//	std::cout<<"\n";
 
-	}
+	//}
 
 	/* Section 6: Compute M'' = log(max(M,1)) */
 	
@@ -691,6 +692,7 @@ int main (int argc, char *argv[] ){
 				LDA, 
 				M_cap.d_nnzPerVector, 
 				M_cap.d_values, M_cap.d_rowIndices, M_cap.d_colIndices); 
+
 	//	if(VERBOSE){
 	//		device2host(&M_cap, M_cap.nnz, g.size);	
 	//		print_csr(
@@ -701,7 +703,11 @@ int main (int argc, char *argv[] ){
 	//	}
 	
 		cudaFree(M_device);
-	
+
+		if(DEBUG){
+			std::cout<<"M_cap nnz: "<<M_cap.nnz<<std::endl;
+		}
+
 		device2host(&M_cap, M_cap.nnz, g.size);
 		log("Completed conversion of data from dense to sparse");
 		end = Clock::now();
@@ -792,7 +798,7 @@ int main (int argc, char *argv[] ){
 				res_mkl);
 		
 		if(mkl_status){
-			std::cout<<"SVD failed"<<std::endl;
+			std::cout<<"SVD failed with status: "<<mkl_status<<std::endl;
 			exit(0);	
 		}
 	
@@ -849,19 +855,24 @@ int main (int argc, char *argv[] ){
 		int nmf_argc = 11;
 		char *nmf_argv[nmf_argc];
 
+		std::string temp;
+
 		nmf_argv[0] = "-est_nmf_gpu";
 		log("Set Prameters");
 		nmf_argv[1] = "-K";
-		nmf_argv[2] = "80";
+		temp = std::to_string(dimension);
+		nmf_argv[2] = &temp[0u];
 		log("Set Prameters");
 		nmf_argv[3] = "-tile_size";
-		nmf_argv[4] = "10";
+		nmf_argv[4] = argv[8];
 		log("Set Prameters");
 		nmf_argv[5] = "-V";
-		sprintf(nmf_argv[6], "%d", g.size);
+		temp = std::to_string(g.size);
+		nmf_argv[6] = &temp[0u];
 		log("Set Prameters");
 		nmf_argv[7] = "-D";
-		sprintf(nmf_argv[8], "%d", g.size);
+		temp = std::to_string(g.size);
+		nmf_argv[8] = &temp[0u];
 		log("Set Prameters");
 		nmf_argv[9] = "-niters";
 		nmf_argv[10] = "10";
@@ -882,18 +893,18 @@ int main (int argc, char *argv[] ){
         		}
     		}
 
-		int nnz = 0;
-		for(int i=0;i<g.size * g.size;i++){
-			if(M_doub[i] !=0)
-				nnz++;
-		}
+		//int nnz = 0;
+		//for(int i=0;i<g.size * g.size;i++){
+		//	if(M_doub[i] !=0)
+		//		nnz++;
+		//}
 
-		std::cout<<"Number of nnz in pruned M"<<nnz<<std::endl;
+		//std::cout<<"Number of nnz in pruned M"<<nnz<<std::endl;
 
 		nmf.init(nmf_argc,nmf_argv);
 		nmf.estimate_HALS_GPU(M_doub);
 
-		write_embeddings(argv[6], nmf.DT, g.size, 80);	
+		write_embeddings(argv[6], nmf.WT, g.size, dimension);	
 		
 	}
 
