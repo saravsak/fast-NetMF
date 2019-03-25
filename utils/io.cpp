@@ -87,6 +87,9 @@ Graph read_graph(std::string filename, std::string format, const char *mapping_f
 	if(!format.compare("dense"))
 		return read_graph_from_dense(filename);
 
+	if(!format.compare("mkl-dense"))
+		return read_graph_from_mkl_dense(filename);
+	
 	if(!format.compare("csr"))
 		return read_graph_from_csr(filename);
 
@@ -225,6 +228,86 @@ Graph read_graph_from_csr(std::string filename){
 	return g;
 
 }
+
+Graph read_graph_from_mkl_dense(std::string filename){
+	std::string line;
+
+	std::ifstream metaFile;
+	std::string metaFilename = filename + "meta.bin";
+	metaFile.open(metaFilename);
+
+	std::cout<<"Reading metadata";
+
+	int num_nodes;
+	int num_edges;
+	int volume;
+
+	metaFile >> line;
+
+	std::string temp;
+	std::stringstream stream(line);
+
+	getline(stream,temp, ',');
+	num_nodes = stoi(temp);
+	
+	getline(stream,temp, ',');
+	num_edges = stoi(temp);
+	
+	getline(stream,temp, ',');
+	volume = stoi(temp);
+	
+	std::cout<<"Reading metadata";
+	std::ifstream adjFile;
+	std::string adjFilename = filename + "adj.bin";
+	adjFile.open(adjFilename);
+	
+	Graph g(num_nodes, num_edges, true);
+
+	g.volume = volume;
+
+	int source;
+	int target;
+	int weight;
+	
+	while(adjFile>>line){
+		std::stringstream st(line);
+		
+		getline(st, temp, ',');
+		source = stoi(temp);
+
+		getline(st, temp, ',');
+		target = stoi(temp);
+
+		getline(st, temp, ',');
+		weight = stof(temp);
+
+		g.adj_mkl[source * num_nodes + target] = weight;
+	}
+
+	std::cout<<"Reading metadata";
+	std::ifstream degFile;
+	std::string degFilename = filename + "degree_diag.bin";
+	degFile.open(degFilename);
+	
+	while(degFile>>line){
+		std::stringstream st(line);
+		
+		getline(st, temp, ',');
+		source = stoi(temp);
+
+		getline(st, temp, ',');
+		target = stoi(temp);
+
+		getline(st, temp, ',');
+		weight = stof(temp);
+
+		g.degree_mkl[source * num_nodes + target] = weight;
+	}
+
+	return g;
+}
+
+
 
 Graph read_graph_from_dense(std::string filename){
 	std::string line;

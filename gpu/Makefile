@@ -25,7 +25,7 @@ netmf_small_sparse: netmf_small_sparse_hybrid.cu utils.o graph.o io.o
 	${NVCC} ${NVCCFLAGS} -o netmf_small_sparse_hybrid $< utils.o graph.o io.o $(NVCCLINKFLAGS) $(MKLFLAGS) $(MKLLINKFLAGS)
 
 netmf_small_dense: netmf_small_dense_hybrid.cu utils.o graph.o io.o
-	${NVCC} ${NVCCFLAGS} -o netmf_small_dense_hybrid $< utils.o graph.o io.o $(NVCCLINKFLAGS) $(MKLFLAGS) $(MKLLINKFLAGS)
+	${NVCC} ${NVCCFLAGS} -o netmf_small_dense_hybrid $< utils.o graph.o io.o $(NMF) $(NVCCLINKFLAGS) $(MKLFLAGS) $(MKLLINKFLAGS)
 
 netmf_small_dense_nmf: netmf_small_dense_hybrid_nmf.cu utils.o graph.o io.o
 	${NVCC} ${NVCCFLAGS} -o netmf_small_dense_hybrid_nmf $< utils.o graph.o io.o $(NMF) $(NVCCLINKFLAGS) $(MKLFLAGS) $(MKLLINKFLAGS)

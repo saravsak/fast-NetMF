@@ -204,24 +204,24 @@ int main(int argc, char *argv[]){
 
 	/* Read graph */
 	log("Reading data from file");
-	Graph g = read_graph(arg_input, "edgelist", arg_mapping);
+	Graph g = read_graph(arg_input, "mkl-dense", arg_mapping);
 	log("Successfully read data from file");
 
 	/* Preprocess graph */
-	log("Preprocessing graph");
+	//log("Preprocessing graph");
 
-	#pragma omp parallel
-	{
-		#pragma omp for
-		for(int i=0;i<g.size;i++){
-			if(g.degree[i * g.size + i] == 0){
-				g.degree[i * g.size + i] = 1.00;
-				g.adj[i * g.size + i] = 1.00;
-			}else{
-				g.adj[i * g.size + i] = 0.00;
-			}
-		}
-	}	
+	//#pragma omp parallel
+	//{
+	//	#pragma omp for
+	//	for(int i=0;i<g.size;i++){
+	//		if(g.degree[i * g.size + i] == 0){
+	//			g.degree[i * g.size + i] = 1.00;
+	//			g.adj[i * g.size + i] = 1.00;
+	//		}else{
+	//			g.adj[i * g.size + i] = 0.00;
+	//		}
+	//	}
+	//}	
 
 	/* Compute D' = D^{-1/2} */
 	log("Computing normalized degree matrix");
@@ -230,7 +230,7 @@ int main(int argc, char *argv[]){
 	{
 		#pragma omp for
 		for(int i=0;i<g.size;i++){
-			g.degree[i * g.size + i] = 1.00 / sqrt(g.degree[i* g.size + i]);
+			g.degree_mkl[i * g.size + i] = 1.00 / sqrt(g.degree_mkl[i* g.size + i]);
 		}
 	}
 
@@ -240,12 +240,12 @@ int main(int argc, char *argv[]){
 	DT *X = (DT *) malloc(g.size * g.size * sizeof(DT));
 
 	cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, 
-        		g.size, g.size, g.size, 1.0, g.degree, g.size, g.adj, g.size, 0.00, X_, g.size);	
+        		g.size, g.size, g.size, 1.0, g.degree_mkl, g.size, g.adj_mkl, g.size, 0.00, X_, g.size);	
 	log("Computing X = X' * D");
 	cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, 
-        		g.size, g.size, g.size, 1.0, X_, g.size, g.degree, g.size, 0.00, X, g.size);	
+        		g.size, g.size, g.size, 1.0, X_, g.size, g.degree_mkl, g.size, 0.00, X, g.size);	
 
-	free(g.adj);
+	free(g.adj_mkl);
 
 	/* Compute S = sum(X^{0}....X^{window_size}) */
 	log("Computing S");
@@ -273,9 +273,9 @@ int main(int argc, char *argv[]){
 	DT *M_ = (DT *) malloc(g.size * g.size * sizeof(DT));
 	DT *M = (DT *) malloc(g.size * g.size * sizeof(DT)); 
 	cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, 
-        	g.size, g.size, g.size, 1.0, g.degree, g.size, S, g.size, 0.00, M_, g.size);
+        	g.size, g.size, g.size, 1.0, g.degree_mkl, g.size, S, g.size, 0.00, M_, g.size);
 	cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, 
-        	g.size, g.size, g.size, 1.0, M_, g.size, g.degree, g.size, 0.00, M, g.size);
+        	g.size, g.size, g.size, 1.0, M_, g.size, g.degree_mkl, g.size, 0.00, M, g.size);
 	
 	free(M_);
 	free(S);
@@ -283,28 +283,22 @@ int main(int argc, char *argv[]){
 	/* Compute M'' = log(max(M,1)) */
 	log("Filtering M");
 	
-	#pragma omp parallel
-	{
-		#pragma omp for
 		for(int i=0;i<g.size * g.size;i++){
-			M[i] = M[i] >= 1? M[i]:1;
-			M[i] = log(M[i]);			
+			if(M[i]<=1){
+				M[i] = 0;
+			}else{
+				M[i] = log(M[i]);
+			}
 		}
-	}
 
 
 	/* Convert M'' to sparse */
 	log("Converting M to sparse");
 	int nnz = 0;
-	#pragma omp parallel
-	{
-		#pragma omp for
 		for(int i=0;i<g.size * g.size; i++){
 			if(M[i]!=0)
 				nnz++;
 		}
-	}
-
 	std::cout<<"# Non zero in M_Cap "<<nnz<<std::endl;
 	sparse_matrix_t M_cap;
 
@@ -319,9 +313,8 @@ int main(int argc, char *argv[]){
 
 	//TODO: Optimize: Highly inefficient
 	int idx = 0;
-	#pragma omp parallel
-	{
-		#pragma omp for
+
+	// Cannot be parallel since idx increaments serially
 		for(int i=0;i<rows;i++){
 			rows_start[i] = idx;
 			for(int j=0;j<cols;j++){
@@ -333,7 +326,6 @@ int main(int argc, char *argv[]){
 			}
 			rows_end[i] = idx;
 		}
-	}	
 
 	mkl_sparse_s_create_csr(&M_cap, SPARSE_INDEX_BASE_ZERO, 
 			rows, cols, rows_start, rows_end, col_idx, vals);	
@@ -384,7 +376,7 @@ int main(int argc, char *argv[]){
 	}
 
 	std::cout<<"Number of singular found: "<<k<<std::endl;
-	//for(int i=0;i<k0;i++){ std::cout<<E_mkl[i]<<" ";} std::cout<<"\n";
+	for(int i=0;i<k0;i++){ std::cout<<E_mkl[i]<<" ";} std::cout<<"\n";
 
 	/* Transform singular values */
 	#pragma omp parallel
@@ -408,9 +400,9 @@ int main(int argc, char *argv[]){
 
 	DT *embeddings = (DT *)mkl_malloc(dimension * g.size * sizeof(DT), 64);
 
-	cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans, 
-        		dimension, g.size, dimension, 1.0, ev, dimension, K_L_mkl, dimension, 0.00, embeddings, g.size);	
-	mkl_simatcopy('R', 'T', g.size, dimension, 1.00, embeddings, dimension, g.size);
+	cblas_sgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, 
+        		g.size, dimension, dimension, 1.0, K_L_mkl, g.size, ev, dimension, 0.00, embeddings, g.size);	
+	//mkl_simatcopy('R', 'T', g.size, dimension, 1.00, embeddings, dimension, g.size);
 	/* Save Embeddings */
 	write_embeddings(arg_output, embeddings, g.size, dimension);
 	

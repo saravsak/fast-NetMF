@@ -5,6 +5,7 @@
 #include<algorithm>
 #include<numeric>
 #include<math.h>
+#include<string.h>
 
 #include<cuda_runtime.h>
 #include<cublas_v2.h>
@@ -13,6 +14,8 @@
 
 #include "../utils/graph.h"
 #include "../utils/io.h"
+
+#include "../utils/model.h"
 
 #include<mkl.h>
 #include<mkl_solvers_ee.h>
@@ -605,7 +608,6 @@ int main (int argc, char *argv[] ){
 	log("Computing M' = D' * S");
 
 	DT *M_temp_device;
-	//DT *M_host;
 
 	cudaMalloc(&M_temp_device, g.size * g.size * sizeof(DT));
 
@@ -629,6 +631,16 @@ int main (int argc, char *argv[] ){
 
 	cudaFree(M_temp_device);
 
+        if(DEBUG){
+		DT *M_host;
+		M_host = (DT *)malloc(g.size * g.size * sizeof(DT));
+		cudaMemcpy(M_host, M_device, g.size * g.size * sizeof(DT), cudaMemcpyDeviceToHost);
+		
+		for(int i=0;i<g.size * g.size;i++) std::cout<<M_host[i]<<" ";
+		std::cout<<"\n";
+
+	}
+
 	/* Section 6: Compute M'' = log(max(M,1)) */
 	
 	/* Procedure 
@@ -645,193 +657,245 @@ int main (int argc, char *argv[] ){
 
 	log("Pruned M");
 
-	/* Step 2: Create CSR struct for both matrices */
-	log("Converting dense matrix to CSR format");	
-	csr M_cap;    /* Variable to hold adjacency matrix in CSR format */
+	if(!strcmp(argv[7], "svd")){
 
-	M_cap.nnz = 0; /* Initialize number of non zeros in adjacency matrix */
-
-	/* Step 6: Compute nnz/row of dense matrix */	
-	log("Computing nnzPerVector for M''");
-
-	cudaMalloc(&M_cap.d_nnzPerVector, 
-			g.size * sizeof(int));
-	cusparseSnnz(cusparse_handle, 
-			CUSPARSE_DIRECTION_ROW, 
-			g.size, g.size, 
-			mat_descr, 
-			M_device, LDA, 
-			M_cap.d_nnzPerVector, &M_cap.nnz);
-	M_cap.h_nnzPerVector = (int *)malloc(g.size * sizeof(int));
-	cudaMemcpy(M_cap.h_nnzPerVector, 
-			M_cap.d_nnzPerVector, 
-			g.size * sizeof(int), 
-			cudaMemcpyDeviceToHost); 
-
-	/* Step 6: Convert dense matrix to sparse matrices */
-	allocate_csr(&M_cap, M_cap.nnz, g.size);
-	cusparseSdense2csr(cusparse_handle, 
-			g.size, g.size, 
-			mat_descr,
-		       	M_device,	
-			LDA, 
-			M_cap.d_nnzPerVector, 
-			M_cap.d_values, M_cap.d_rowIndices, M_cap.d_colIndices); 
-//	if(VERBOSE){
-//		device2host(&M_cap, M_cap.nnz, g.size);	
-//		print_csr(
-//    			g.size,
-//    			M_cap.nnz,
-//    			M_cap,
-//    			"Adjacency matrix");
-//	}
-
-	cudaFree(M_device);
-
-	device2host(&M_cap, M_cap.nnz, g.size);
-	log("Completed conversion of data from dense to sparse");
-	end = Clock::now();
-	profile.compute_m = std::chrono::duration_cast<milliseconds>(end - begin);
+		/* Step 2: Create CSR struct for both matrices */
+		log("Converting dense matrix to CSR format");	
+		csr M_cap;    /* Variable to hold adjacency matrix in CSR format */
+	
+		M_cap.nnz = 0; /* Initialize number of non zeros in adjacency matrix */
+	
+		/* Step 6: Compute nnz/row of dense matrix */	
+		log("Computing nnzPerVector for M''");
+	
+		cudaMalloc(&M_cap.d_nnzPerVector, 
+				g.size * sizeof(int));
+		cusparseSnnz(cusparse_handle, 
+				CUSPARSE_DIRECTION_ROW, 
+				g.size, g.size, 
+				mat_descr, 
+				M_device, LDA, 
+				M_cap.d_nnzPerVector, &M_cap.nnz);
+		M_cap.h_nnzPerVector = (int *)malloc(g.size * sizeof(int));
+		cudaMemcpy(M_cap.h_nnzPerVector, 
+				M_cap.d_nnzPerVector, 
+				g.size * sizeof(int), 
+				cudaMemcpyDeviceToHost); 
+	
+		/* Step 6: Convert dense matrix to sparse matrices */
+		allocate_csr(&M_cap, M_cap.nnz, g.size);
+		cusparseSdense2csr(cusparse_handle, 
+				g.size, g.size, 
+				mat_descr,
+			       	M_device,	
+				LDA, 
+				M_cap.d_nnzPerVector, 
+				M_cap.d_values, M_cap.d_rowIndices, M_cap.d_colIndices); 
+	//	if(VERBOSE){
+	//		device2host(&M_cap, M_cap.nnz, g.size);	
+	//		print_csr(
+	//    			g.size,
+	//    			M_cap.nnz,
+	//    			M_cap,
+	//    			"Adjacency matrix");
+	//	}
+	
+		cudaFree(M_device);
+	
+		device2host(&M_cap, M_cap.nnz, g.size);
+		log("Completed conversion of data from dense to sparse");
+		end = Clock::now();
+		profile.compute_m = std::chrono::duration_cast<milliseconds>(end - begin);
+			
+		/* Section 7: Compute SVD of objective matrix */	
+	
+		begin = Clock::now();
+		char whichS = 'L';
+		char whichV = 'L';
+	
+		MKL_INT pm[128];
+		mkl_sparse_ee_init(pm);
+		//pm[1] = 100;
+		//pm[2] = 2;
+		//pm[4] = 60;
+	
+		MKL_INT mkl_rows = g.size;
+		MKL_INT mkl_cols = g.size;
+	
+	
+		//MKL_INT rows_start[mkl_rows];
+		//MKL_INT rows_end[mkl_rows];
+	
+		MKL_INT *rows_start;
+		MKL_INT *rows_end;
+	
+		rows_start = (MKL_INT *)mkl_malloc(mkl_rows * sizeof(MKL_INT),64);
+		rows_end = (MKL_INT *)mkl_malloc(mkl_rows * sizeof(MKL_INT),64);
+	
+		for(int i=0;i<mkl_rows;i++){
+			rows_start[i] = M_cap.h_rowIndices[i];
+			rows_end[i] = M_cap.h_rowIndices[i+1];
+		}
+	
 		
-	/* Section 7: Compute SVD of objective matrix */	
-
-	begin = Clock::now();
-	char whichS = 'L';
-	char whichV = 'L';
-
-	MKL_INT pm[128];
-	mkl_sparse_ee_init(pm);
-	//pm[1] = 100;
-	//pm[2] = 2;
-	//pm[4] = 60;
-
-	MKL_INT mkl_rows = g.size;
-	MKL_INT mkl_cols = g.size;
-
-
-	//MKL_INT rows_start[mkl_rows];
-	//MKL_INT rows_end[mkl_rows];
-
-	MKL_INT *rows_start;
-	MKL_INT *rows_end;
-
-	rows_start = (MKL_INT *)mkl_malloc(mkl_rows * sizeof(MKL_INT),64);
-	rows_end = (MKL_INT *)mkl_malloc(mkl_rows * sizeof(MKL_INT),64);
-
-	for(int i=0;i<mkl_rows;i++){
-		rows_start[i] = M_cap.h_rowIndices[i];
-		rows_end[i] = M_cap.h_rowIndices[i+1];
-	}
-
+		//MKL_INT mkl_col_idx[M_cap.nnz];
 	
-	//MKL_INT mkl_col_idx[M_cap.nnz];
-
-	MKL_INT *mkl_col_idx;
-	mkl_col_idx = (MKL_INT*)mkl_malloc(M_cap.nnz * sizeof(MKL_INT), 64);
-
-	int mkl_temp;
-	for(int i=0;i<M_cap.nnz;i++){
-		mkl_temp = M_cap.h_colIndices[i];
-		mkl_col_idx[i] = mkl_temp;
-	}
-
-
-	sparse_matrix_t M_mkl;
-	sparse_index_base_t indexing = SPARSE_INDEX_BASE_ZERO;
-
-	mkl_sparse_s_create_csr(&M_mkl, indexing,
-					mkl_rows, mkl_cols,
-					rows_start, rows_end,
-					mkl_col_idx, M_cap.h_values);
-
-	log("Created MKL sparse");
-
-	matrix_descr mkl_descrM;
-	mkl_descrM.type = SPARSE_MATRIX_TYPE_GENERAL;	
-	mkl_descrM.mode = SPARSE_FILL_MODE_UPPER;
-	mkl_descrM.diag = SPARSE_DIAG_NON_UNIT;
-
-	MKL_INT k0 = dimension;
-	MKL_INT k;
-
-	DT *E_mkl, *K_L_mkl, *K_R_mkl, *res_mkl;
-
-	E_mkl = (DT *)mkl_malloc(k0 * sizeof(DT), 128);
-	K_L_mkl = (DT *)mkl_malloc( k0*mkl_rows*sizeof( DT), 128 );
-        K_R_mkl = (DT *)mkl_malloc( k0*mkl_cols*sizeof( DT), 128 );
-        res_mkl = (DT *)mkl_malloc( k0*sizeof( DT), 128 );
-
-	memset(E_mkl, 0 , k0);
-	memset(K_L_mkl, 0 , k0);
-	memset(K_R_mkl, 0 , k0);
-	memset(res_mkl, 0 , k0);
-
-	int mkl_status = 0;
-
-	log("Computing SVD via MKL");
-	mkl_status = mkl_sparse_s_svd(&whichS, &whichV, pm,
-			M_mkl, mkl_descrM,
-			k0, &k,
-			E_mkl,
-			K_L_mkl,
-			K_R_mkl,
-			res_mkl);
+		MKL_INT *mkl_col_idx;
+		mkl_col_idx = (MKL_INT*)mkl_malloc(M_cap.nnz * sizeof(MKL_INT), 64);
 	
-	if(mkl_status){
-		std::cout<<"SVD failed"<<std::endl;
-		exit(0);	
+		int mkl_temp;
+		for(int i=0;i<M_cap.nnz;i++){
+			mkl_temp = M_cap.h_colIndices[i];
+			mkl_col_idx[i] = mkl_temp;
+		}
+	
+	
+		sparse_matrix_t M_mkl;
+		sparse_index_base_t indexing = SPARSE_INDEX_BASE_ZERO;
+	
+		mkl_sparse_s_create_csr(&M_mkl, indexing,
+						mkl_rows, mkl_cols,
+						rows_start, rows_end,
+						mkl_col_idx, M_cap.h_values);
+	
+		log("Created MKL sparse");
+	
+		matrix_descr mkl_descrM;
+		mkl_descrM.type = SPARSE_MATRIX_TYPE_GENERAL;	
+		mkl_descrM.mode = SPARSE_FILL_MODE_UPPER;
+		mkl_descrM.diag = SPARSE_DIAG_NON_UNIT;
+	
+		MKL_INT k0 = dimension;
+		MKL_INT k;
+	
+		DT *E_mkl, *K_L_mkl, *K_R_mkl, *res_mkl;
+	
+		E_mkl = (DT *)mkl_malloc(k0 * sizeof(DT), 128);
+		K_L_mkl = (DT *)mkl_malloc( k0*mkl_rows*sizeof( DT), 128 );
+	        K_R_mkl = (DT *)mkl_malloc( k0*mkl_cols*sizeof( DT), 128 );
+	        res_mkl = (DT *)mkl_malloc( k0*sizeof( DT), 128 );
+	
+		memset(E_mkl, 0 , k0);
+		memset(K_L_mkl, 0 , k0);
+		memset(K_R_mkl, 0 , k0);
+		memset(res_mkl, 0 , k0);
+	
+		int mkl_status = 0;
+	
+		log("Computing SVD via MKL");
+		mkl_status = mkl_sparse_s_svd(&whichS, &whichV, pm,
+				M_mkl, mkl_descrM,
+				k0, &k,
+				E_mkl,
+				K_L_mkl,
+				K_R_mkl,
+				res_mkl);
+		
+		if(mkl_status){
+			std::cout<<"SVD failed"<<std::endl;
+			exit(0);	
+		}
+	
+	
+		log("Computed SVD via MKL");
+	
+		if(DEBUG){
+		std::cout<<"Number of singular found: "<<k<<std::endl;
+		for(int i=0;i<k0;i++){ std::cout<<E_mkl[i]<<" ";} std::cout<<"\n";
+		}
+	
+		DT *U_device, *Si_device;
+		//DT *U_host;
+		DT *Si_host;
+		DT *E_device, *E_host;
+	
+		cudaMalloc(&U_device, g.size * dimension * sizeof(DT));
+		cudaMalloc(&E_device, g.size * dimension * sizeof(DT));
+		cudaMalloc(&Si_device, dimension * sizeof(DT));
+	
+		//U_host = (DT *) malloc(g.size * dimension * sizeof(DT));
+		E_host = (DT *) malloc(g.size * dimension * sizeof(DT));
+		Si_host = (DT *) malloc(dimension * sizeof(DT));
+	
+		cudaMemcpy(U_device, K_L_mkl, g.size * dimension * sizeof(DT), cudaMemcpyHostToDevice);
+		cudaMemcpy(Si_device, E_mkl, dimension * sizeof(DT), cudaMemcpyHostToDevice);
+	
+		transform_si<<<grids,threads>>>(Si_device, dimension);
+	
+		cudaMemcpy(Si_host, Si_device, dimension * sizeof(DT), cudaMemcpyDeviceToHost);
+	
+		std::cout<<"\n";
+		cublasSdgmm(cublas_handle, CUBLAS_SIDE_RIGHT,
+			g.size, dimension,
+			U_device, g.size, 
+			Si_device, 1.0,
+			E_device, g.size);
+	
+		cudaMemcpy(E_host, E_device, g.size * dimension * sizeof(DT), cudaMemcpyDeviceToHost);
+	
+		end = Clock::now();
+		profile.svd = std::chrono::duration_cast<milliseconds>(end - begin);
+	
+	
+		overall_end = Clock::now();
+		profile.emb = std::chrono::duration_cast<milliseconds>(overall_end - overall_begin);
+		mkl_free(rows_start);	
+		mkl_free(rows_end);	
+		mkl_free(mkl_col_idx);
+		write_embeddings(argv[6],E_host, g.size, dimension);
+	}else if(!strcmp(argv[7], "nmf")){
+		model nmf;
+
+		int nmf_argc = 11;
+		char *nmf_argv[nmf_argc];
+
+		nmf_argv[0] = "-est_nmf_gpu";
+		log("Set Prameters");
+		nmf_argv[1] = "-K";
+		nmf_argv[2] = "80";
+		log("Set Prameters");
+		nmf_argv[3] = "-tile_size";
+		nmf_argv[4] = "10";
+		log("Set Prameters");
+		nmf_argv[5] = "-V";
+		sprintf(nmf_argv[6], "%d", g.size);
+		log("Set Prameters");
+		nmf_argv[7] = "-D";
+		sprintf(nmf_argv[8], "%d", g.size);
+		log("Set Prameters");
+		nmf_argv[9] = "-niters";
+		nmf_argv[10] = "10";
+
+		log("Set Prameters");
+
+		int v = g.size;
+		int d = g.size;
+
+		DT *M_cap = (DT *) malloc(v * d * sizeof(DT));
+		cudaMemcpy(M_cap, M_device, v * d * sizeof(DT), cudaMemcpyDeviceToHost);
+
+		double *M_doub = (double *) malloc(v * d * sizeof(double));
+
+		for(int i=0;i<v;i++){
+        		for(int j=0;j<d;j++){
+        	        	M_doub[i * d + j] = M_cap[i * d + j];
+        		}
+    		}
+
+		int nnz = 0;
+		for(int i=0;i<g.size * g.size;i++){
+			if(M_doub[i] !=0)
+				nnz++;
+		}
+
+		std::cout<<"Number of nnz in pruned M"<<nnz<<std::endl;
+
+		nmf.init(nmf_argc,nmf_argv);
+		nmf.estimate_HALS_GPU(M_doub);
+
+		write_embeddings(argv[6], nmf.DT, g.size, 80);	
+		
 	}
-
-
-	log("Computed SVD via MKL");
-
-	if(DEBUG){
-	std::cout<<"Number of singular found: "<<k<<std::endl;
-	for(int i=0;i<k0;i++){ std::cout<<E_mkl[i]<<" ";} std::cout<<"\n";
-	}
-
-	DT *U_device, *Si_device;
-	//DT *U_host;
-	DT *Si_host;
-	DT *E_device, *E_host;
-
-	cudaMalloc(&U_device, g.size * dimension * sizeof(DT));
-	cudaMalloc(&E_device, g.size * dimension * sizeof(DT));
-	cudaMalloc(&Si_device, dimension * sizeof(DT));
-
-	//U_host = (DT *) malloc(g.size * dimension * sizeof(DT));
-	E_host = (DT *) malloc(g.size * dimension * sizeof(DT));
-	Si_host = (DT *) malloc(dimension * sizeof(DT));
-
-	cudaMemcpy(U_device, K_L_mkl, g.size * dimension * sizeof(DT), cudaMemcpyHostToDevice);
-	cudaMemcpy(Si_device, E_mkl, dimension * sizeof(DT), cudaMemcpyHostToDevice);
-
-	transform_si<<<grids,threads>>>(Si_device, dimension);
-
-	cudaMemcpy(Si_host, Si_device, dimension * sizeof(DT), cudaMemcpyDeviceToHost);
-
-	std::cout<<"\n";
-	cublasSdgmm(cublas_handle, CUBLAS_SIDE_RIGHT,
-		g.size, dimension,
-		U_device, g.size, 
-		Si_device, 1.0,
-		E_device, g.size);
-
-	cudaMemcpy(E_host, E_device, g.size * dimension * sizeof(DT), cudaMemcpyDeviceToHost);
-
-	end = Clock::now();
-	profile.svd = std::chrono::duration_cast<milliseconds>(end - begin);
-
-
-	overall_end = Clock::now();
-	profile.emb = std::chrono::duration_cast<milliseconds>(overall_end - overall_begin);
-
 
 	write_profile("profile.txt", profile);
-	write_embeddings(argv[6],E_host, g.size, dimension);
-
-	mkl_free(rows_start);	
-	mkl_free(rows_end);	
-	mkl_free(mkl_col_idx);	
-
 }

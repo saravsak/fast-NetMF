@@ -350,8 +350,8 @@ int main (int argc, char *argv[] ){
         log("Reading data from file");
 	
 	//Graph g =  read_graph("../data/test/small_test.csv","edgelist");
-	Graph g =  read_graph(argv[5],"edgelist", argv[7]);
 	begin = Clock::now(); 
+	Graph g =  read_graph(argv[5],"dense", argv[7]);
 	//Graph g =  read_graph("../../nrl-data/wikipedia.edgelist","edgelist");
 	end = Clock::now();
 

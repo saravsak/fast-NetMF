@@ -29,6 +29,43 @@ Graph::Graph(int N )
 	
 }
 
+Graph::Graph(int N, int E, bool mode )
+{
+	this->size = N;
+	this->num_edges = E;
+	this->volume = 0;
+	this->directed = false; // Always false, since NetMF assumes undirected graphs 
+
+	if(mode){
+		this->adj_mkl = (DT*) malloc (N * N * sizeof(DT));
+		this->degree_mkl = (DT*) malloc (N * N * sizeof(DT));
+
+		memset(this->adj_mkl, 0, N*N*sizeof(DT));
+		memset(this->degree_mkl, 0,N* N*sizeof(DT));
+	}else{
+		this->adj_csr.h_rowIndices = (int *) malloc((N+1) * sizeof(int));
+		this->adj_csr.h_colIndices = (int *) malloc(E * sizeof(int));
+		this->adj_csr.h_values = (DT *) malloc(E * sizeof(DT));
+		this->adj_csr.nnz = E;
+	
+		this->degree_csr.h_rowIndices = (int *) malloc((N+1) * sizeof(int));
+		this->degree_csr.h_colIndices = (int *) malloc(N * sizeof(int));
+		this->degree_csr.h_values = (DT *) malloc(N * sizeof(DT));
+		this->degree_csr.nnz = N;
+	}
+	//memset(this->adj, 0, N*N*sizeof(DT));
+	//memset(this->degree, 0, N*sizeof(DT));
+
+	//for(int i=0; i < this->size; i++)
+	//	for(int j=0; j< this->size; j++)
+	//		this->adj[i * this->size + j] = 0;
+
+	//for(int i=0; i < this->size; i++)
+	//	this->degree[i * this->size + i] = -1;
+	
+}
+
+
 Graph::Graph(int N, int E )
 {
 

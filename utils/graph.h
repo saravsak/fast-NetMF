@@ -8,6 +8,8 @@
 #include<cstring>
 #include <iostream>
 
+#include "mkl.h"
+
 //typedef double DT;
 typedef float DT;
 
@@ -38,11 +40,15 @@ class Graph
 		DT *adj, *degree;
 		
 		// Sparse
-		csr adj_csr, degree_csr;	
+		csr adj_csr, degree_csr;
+
+		// MKL dense
+		DT *adj_mkl, *degree_mkl;
 			
 		bool directed;
 		Graph(int);
 		Graph(int, int);
+		Graph(int, int, bool);
 		void add_edge(int, int, DT);
 		void print_degree();
 		void print_graph();
