@@ -33,9 +33,9 @@ void write_embeddings(const char * fileName, double **embeddings, int size, int 
 	std::ofstream op;
 	op.open(fileName);
 	op<<size<<" "<<dim<<std::endl;
-	for(int j=0;j<size;j++){
-		op << j << " ";
-		for(int i=0;i<dim;i++){
+	for(int i=0;i<size;i++){
+		op << i << " ";
+		for(int j=0;j<dim;j++){
 			op << embeddings[i][j] << " ";	
 		}
 		op<<std::endl;

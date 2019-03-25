@@ -2,15 +2,16 @@ CXX=icc
 CXXFLAGS=-O3 -g -march=native -std=c++11 -fPIC
 
 NVCC=nvcc
-NVCCFLAGS += -O3 -w -arch=sm_70 --std=c++11 -m64 -rdc=true -Xptxas -dlcm=ca -Xcompiler -fopenmp -lineinfo -G -g
+NVCCFLAGS += -O3 -w -arch=sm_61 --std=c++11 -m64 -rdc=true -Xptxas -dlcm=ca -Xcompiler -fopenmp -lineinfo -G -g
 NVCCLINKFLAGS= -lcublas -lcusolver -lcusparse -lcudart
 
-MKLROOT = ~/intel/compilers_and_libraries_2019.3.199/linux/mkl
+MKLROOT = ~/intel/compilers_and_libraries_2019.1.144/linux/mkl
 MKLINCLUDE := $(MKLROOT)/include
 MKLPATH := $(MKLROOT)/lib/intel64_lin
 
 MKLFLAGS:= -I $(MKLINCLUDE)
-ICCLINK:= /opt/intel/compilers_and_libraries/linux/lib/intel64_lin
+#ICCLINK:= /opt/intel/compilers_and_libraries/linux/lib/intel64_lin
+ICCLINK:= /opt/intel/system_studio_2019/lib/intel64_lin/
 ICCINC:= $(ICCLINK)/libirc.a,$(ICCLINK)/libiomp5.so
 MKLLINKFLAGS:= --linker-options $(MKLPATH)/libmkl_intel_lp64.a,$(MKLPATH)/libmkl_sequential.a,$(MKLPATH)/libmkl_core.a,$(ICCINC),-lpthread
 
