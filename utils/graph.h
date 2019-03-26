@@ -23,6 +23,7 @@ struct csr{
 	// Host variables
 	DT *h_values;
 	int *h_rowIndices;
+	int *h_rowEndIndices;
 	int *h_colIndices;
 	int *h_nnzPerVector;
 	int nnz;
@@ -44,11 +45,12 @@ class Graph
 
 		// MKL dense
 		DT *adj_mkl, *degree_mkl;
-			
+
 		bool directed;
 		Graph(int);
 		Graph(int, int);
 		Graph(int, int, bool);
+		Graph(int, sparse_matrix_t *A, sparse_matrix_t *D);
 		void add_edge(int, int, DT);
 		void print_degree();
 		void print_graph();

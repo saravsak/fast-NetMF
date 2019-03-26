@@ -8,6 +8,9 @@
 #include<cstring>
 #include "utils.h"
 
+#include "mkl.h"
+
+
 Graph::Graph(int N )
 {
 	this->adj = (DT*) malloc (N * N * sizeof(DT));
@@ -43,12 +46,14 @@ Graph::Graph(int N, int E, bool mode )
 		memset(this->adj_mkl, 0, N*N*sizeof(DT));
 		memset(this->degree_mkl, 0,N* N*sizeof(DT));
 	}else{
-		this->adj_csr.h_rowIndices = (int *) malloc((N+1) * sizeof(int));
+		this->adj_csr.h_rowIndices = (int *) malloc((N) * sizeof(int));
+		this->adj_csr.h_rowEndIndices = (int *) malloc((N) * sizeof(int));
 		this->adj_csr.h_colIndices = (int *) malloc(E * sizeof(int));
 		this->adj_csr.h_values = (DT *) malloc(E * sizeof(DT));
 		this->adj_csr.nnz = E;
 	
-		this->degree_csr.h_rowIndices = (int *) malloc((N+1) * sizeof(int));
+		this->degree_csr.h_rowIndices = (int *) malloc((N) * sizeof(int));
+		this->degree_csr.h_rowEndIndices = (int *) malloc((N) * sizeof(int));
 		this->degree_csr.h_colIndices = (int *) malloc(N * sizeof(int));
 		this->degree_csr.h_values = (DT *) malloc(N * sizeof(DT));
 		this->degree_csr.nnz = N;

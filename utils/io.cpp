@@ -90,12 +90,172 @@ Graph read_graph(std::string filename, std::string format, const char *mapping_f
 	if(!format.compare("mkl-dense"))
 		return read_graph_from_mkl_dense(filename);
 	
+	if(!format.compare("mkl-sparse"))
+		return read_graph_from_mkl_sparse(filename);
+	
 	if(!format.compare("csr"))
 		return read_graph_from_csr(filename);
 
 	if(!format.compare("edgelist"))
 		return read_graph_from_edgelist(filename, mapping_filename);
 }
+
+Graph read_graph_from_mkl_sparse(std::string filename){
+	std::string line;
+
+	std::ifstream metaFile;
+	std::string metaFilename = filename + "meta.bin";
+	metaFile.open(metaFilename);
+
+	std::cout<<"Reading metadata";
+
+	int num_nodes;
+	int num_edges;
+	int volume;
+
+	metaFile >> line;
+
+	std::string temp;
+	std::stringstream stream(line);
+
+	getline(stream,temp, ',');
+	num_nodes = stoi(temp);
+	
+	getline(stream,temp, ',');
+	num_edges = stoi(temp);
+	
+	getline(stream,temp, ',');
+	volume = stoi(temp);
+
+	Graph g(num_nodes, num_edges, false);
+	g.volume = volume;
+
+	std::ifstream adjFile;
+	std::string adjFilename = filename + "adj_vals.bin";
+	adjFile.open(adjFilename);
+
+	while(adjFile >> line){
+		std::stringstream st(line);
+	
+		int i=0;	
+		while(getline(st, temp, ',')){
+			g.adj_csr.h_values[i] = stof(temp);
+			i++;
+		}
+
+	}	
+	adjFile.close();
+	
+	adjFilename = filename + "adj_cols.bin";
+	adjFile.open(adjFilename);
+	
+	while(adjFile >> line){
+		std::stringstream st(line);
+	
+		int i=0;	
+		while(getline(st, temp, ',')){
+			g.adj_csr.h_colIndices[i] = stoi(temp);
+			i++;
+		}
+
+	}	
+	adjFile.close();
+
+	adjFilename = filename + "adj_rows_start.bin";
+	adjFile.open(adjFilename);
+	
+	while(adjFile >> line){
+		std::stringstream st(line);
+	
+		int i=0;	
+		while(getline(st, temp, ',')){
+			g.adj_csr.h_rowIndices[i] = stoi(temp);
+			i++;
+		}
+
+	}	
+	adjFile.close();
+
+	adjFilename = filename + "adj_rows_end.bin";
+	adjFile.open(adjFilename);
+	
+	while(adjFile >> line){
+		std::stringstream st(line);
+	
+		int i=0;	
+		while(getline(st, temp, ',')){
+			g.adj_csr.h_rowEndIndices[i] = stoi(temp);
+			i++;
+		}
+
+	}	
+	adjFile.close();
+
+	std::ifstream degFile;
+	std::string degFilename = filename + "degree_vals.bin";
+	degFile.open(degFilename);
+
+	while(degFile >> line){
+		std::stringstream st(line);
+	
+		int i=0;	
+		while(getline(st, temp, ',')){
+			g.degree_csr.h_values[i] = stof(temp);
+			i++;
+		}
+
+	}	
+	degFile.close();
+	
+	degFilename = filename + "degree_cols.bin";
+	degFile.open(degFilename);
+	
+	while(degFile >> line){
+		std::stringstream st(line);
+	
+		int i=0;	
+		while(getline(st, temp, ',')){
+			g.degree_csr.h_colIndices[i] = stoi(temp);
+			i++;
+		}
+
+	}	
+	degFile.close();
+
+	degFilename = filename + "degree_rows_start.bin";
+	degFile.open(degFilename);
+	
+	while(degFile >> line){
+		std::stringstream st(line);
+	
+		int i=0;	
+		while(getline(st, temp, ',')){
+			g.degree_csr.h_rowIndices[i] = stoi(temp);
+			i++;
+		}
+
+	}	
+	degFile.close();
+
+	degFilename = filename + "degree_rows_end.bin";
+	degFile.open(degFilename);
+	
+	while(degFile >> line){
+		std::stringstream st(line);
+	
+		int i=0;	
+		while(getline(st, temp, ',')){
+			g.degree_csr.h_rowEndIndices[i] = stoi(temp);
+			i++;
+		}
+
+	}	
+	degFile.close();
+
+	return g;
+
+}
+
 
 Graph read_graph_from_csr(std::string filename){
 	std::string line;
