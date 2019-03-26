@@ -375,7 +375,7 @@ int main ( int argc, char **argv ){
         log("Reading data from file");
 	
 	begin = Clock::now(); 
-	Graph g =  read_graph(argv[5],"edgelist", argv[7]);
+	Graph g =  read_graph(argv[5],"dense", argv[7]);
 	end = Clock::now();
 
 	profile.iptime = std::chrono::duration_cast<milliseconds>(end - begin);
@@ -423,8 +423,8 @@ int main ( int argc, char **argv ){
 	log("Creating dense device array");
 	DT *adj_device_dense;	
 	DT *degree_device_dense; 
-	DT *adj_host_dense;	
-	DT *degree_host_dense; 
+	//DT *g.adj;	
+	//DT *g.degree; 
 
 	/* Step 2a: Allocate space for adjacency and degree matrix on device*/
 	log("Allocating space for degree and adjacency mat on device");
@@ -435,8 +435,8 @@ int main ( int argc, char **argv ){
 
 	/* Step 2a: Allocate space for adjacency and degree matrix on host */
 	log("Allocating space for degree and adjacency matrix on host");
-	adj_host_dense = (DT *) malloc(g.size * g.size * sizeof(DT));
-	degree_host_dense = (DT *) malloc(g.size * sizeof(DT));
+	//adj_host_dense = (DT *) malloc(g.size * g.size * sizeof(DT));
+	//degree_host_dense = (DT *) malloc(g.size * sizeof(DT));
 
 	/* Step 3: Copy dense matrix from host to device */
 	log("Copying dense matrix from host to device");	
@@ -445,7 +445,7 @@ int main ( int argc, char **argv ){
 			g.size * g.size * sizeof(DT), 
 			cudaMemcpyHostToDevice);	
 	cudaMemcpy(degree_device_dense, 
-			g.degree1D, 
+			g.degree, 
 			g.size * sizeof(DT), 
 			cudaMemcpyHostToDevice);
 
