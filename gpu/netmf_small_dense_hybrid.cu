@@ -849,64 +849,65 @@ int main (int argc, char *argv[] ){
 		mkl_free(rows_end);	
 		mkl_free(mkl_col_idx);
 		write_embeddings(argv[6],E_host, g.size, dimension);
-	}else if(!strcmp(argv[7], "nmf")){
-		model nmf;
-
-		int nmf_argc = 11;
-		char *nmf_argv[nmf_argc];
-
-		std::string temp;
-
-		nmf_argv[0] = "-est_nmf_gpu";
-		log("Set Prameters");
-		nmf_argv[1] = "-K";
-		temp = std::to_string(dimension);
-		nmf_argv[2] = &temp[0u];
-		log("Set Prameters");
-		nmf_argv[3] = "-tile_size";
-		nmf_argv[4] = argv[8];
-		log("Set Prameters");
-		nmf_argv[5] = "-V";
-		temp = std::to_string(g.size);
-		nmf_argv[6] = &temp[0u];
-		log("Set Prameters");
-		nmf_argv[7] = "-D";
-		temp = std::to_string(g.size);
-		nmf_argv[8] = &temp[0u];
-		log("Set Prameters");
-		nmf_argv[9] = "-niters";
-		nmf_argv[10] = "10";
-
-		log("Set Prameters");
-
-		int v = g.size;
-		int d = g.size;
-
-		DT *M_cap = (DT *) malloc(v * d * sizeof(DT));
-		cudaMemcpy(M_cap, M_device, v * d * sizeof(DT), cudaMemcpyDeviceToHost);
-
-		double *M_doub = (double *) malloc(v * d * sizeof(double));
-
-		for(int i=0;i<v;i++){
-        		for(int j=0;j<d;j++){
-        	        	M_doub[i * d + j] = M_cap[i * d + j];
-        		}
-    		}
-
-		//int nnz = 0;
-		//for(int i=0;i<g.size * g.size;i++){
-		//	if(M_doub[i] !=0)
-		//		nnz++;
-		//}
-
-		//std::cout<<"Number of nnz in pruned M"<<nnz<<std::endl;
-
-		nmf.init(nmf_argc,nmf_argv);
-		nmf.estimate_HALS_GPU(M_doub);
-
-		write_embeddings(argv[6], nmf.WT, g.size, dimension);	
-		
 	}
+//	else if(!strcmp(argv[7], "nmf")){
+//		model nmf;
+//
+//		int nmf_argc = 11;
+//		char *nmf_argv[nmf_argc];
+//
+//		std::string temp;
+//
+//		nmf_argv[0] = "-est_nmf_gpu";
+//		log("Set Prameters");
+//		nmf_argv[1] = "-K";
+//		temp = std::to_string(dimension);
+//		nmf_argv[2] = &temp[0u];
+//		log("Set Prameters");
+//		nmf_argv[3] = "-tile_size";
+//		nmf_argv[4] = argv[8];
+//		log("Set Prameters");
+//		nmf_argv[5] = "-V";
+//		temp = std::to_string(g.size);
+//		nmf_argv[6] = &temp[0u];
+//		log("Set Prameters");
+//		nmf_argv[7] = "-D";
+//		temp = std::to_string(g.size);
+//		nmf_argv[8] = &temp[0u];
+//		log("Set Prameters");
+//		nmf_argv[9] = "-niters";
+//		nmf_argv[10] = "10";
+//
+//		log("Set Prameters");
+//
+//		int v = g.size;
+//		int d = g.size;
+//
+//		DT *M_cap = (DT *) malloc(v * d * sizeof(DT));
+//		cudaMemcpy(M_cap, M_device, v * d * sizeof(DT), cudaMemcpyDeviceToHost);
+//
+//		double *M_doub = (double *) malloc(v * d * sizeof(double));
+//
+//		for(int i=0;i<v;i++){
+//        		for(int j=0;j<d;j++){
+//        	        	M_doub[i * d + j] = M_cap[i * d + j];
+//        		}
+//    		}
+//
+//		//int nnz = 0;
+//		//for(int i=0;i<g.size * g.size;i++){
+//		//	if(M_doub[i] !=0)
+//		//		nnz++;
+//		//}
+//
+//		//std::cout<<"Number of nnz in pruned M"<<nnz<<std::endl;
+//
+//		nmf.init(nmf_argc,nmf_argv);
+//		nmf.estimate_HALS_GPU(M_doub);
+//
+//		write_embeddings(argv[6], nmf.WT, g.size, dimension);	
+//		
+//	}
 
 	write_profile("profile.txt", profile);
 }

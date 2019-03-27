@@ -6,11 +6,6 @@
 #include<numeric>
 #include<math.h>
 
-#include<cuda_runtime.h>
-#include<cublas_v2.h>
-#include<cusolverDn.h>
-#include <cusparse_v2.h>
-
 #include "../utils/graph.h"
 #include "../utils/io.h"
 
@@ -22,156 +17,6 @@
 
 #define NUM_STREAMS 4
 #define TILE_SIZE 2
-
-#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
-
-inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
-{
-   if (code != cudaSuccess)
-   {
-      fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
-      if (abort) exit(code);
-   }
-}
-
-void make_tile(DT* A, DT *B, int om, int on, int m, int n, int row_offset, int col_offset){
-        int row = 0, col = 0;
-        row_offset = row_offset * m;
-        col_offset = col_offset * n;
-
-	#pragma omp parallel
-	{
-		#pragma for collapse(2)
-        	for(int i=0;i<m;i++){
-                	row = row_offset + i;
-                	for(int j=0;j<n;j++){
-                        	col = col_offset + j;
-                        	B[i + j * m] = A[row + col * om];
-                	}
-        	}
-	}	
-}
-
-void copy_tile(DT* A, DT *B, int om, int on, int m, int n, int row_offset, int col_offset){
-
-        int row = 0, col = 0;
-        row_offset = row_offset * m;
-        col_offset = col_offset * n;
-
-	#pragma omp parallel
-	{
-		#pragma for collapse(2)
-        	for(int i=0;i<m;i++){
-        	        row = row_offset + i;
-        	        for(int j=0;j<n;j++){
-        	                col = col_offset + j;
-        	                A[row + col * om] = B[i + j * m];
-        	        }
-        	}
-	}
-}
-
-void tiled_dgmm(DT *diag, DT *A, DT *C, int m, int n){
-
-	cudaStream_t streams[NUM_STREAMS];
-
-	for(int i=0; i<NUM_STREAMS;i++){
-		cudaStreamCreate(&streams[i]);
-	}
-
-	DT *tile_d[NUM_STREAMS];
-	DT *tile_h[NUM_STREAMS];
-	
-	DT *diag_d[NUM_STREAMS];
-	DT *diag_h[NUM_STREAMS];
-
-	DT *res_d[NUM_STREAMS];
-	DT *res_h[NUM_STREAMS];
-	
-	int num_tiles = ceil(((float) m)/(TILE_SIZE));
-
-	log("Check 1");
-
-        for(int i=0;i<NUM_STREAMS;i++){
-                gpuErrchk(cudaMalloc(&tile_d[i],
-                                        TILE_SIZE * TILE_SIZE * sizeof(DT)));
-                gpuErrchk(cudaMalloc(&res_d[i],
-                                        TILE_SIZE * TILE_SIZE * sizeof(DT)));
-                gpuErrchk(cudaMalloc(&diag_d[i],
-                                        TILE_SIZE * sizeof(DT)));
-
-		gpuErrchk(cudaHostAlloc(&tile_h[i],
-                                TILE_SIZE*TILE_SIZE*sizeof(DT),
-                                cudaHostAllocDefault));
-		gpuErrchk(cudaHostAlloc(&res_h[i],
-                                TILE_SIZE*TILE_SIZE*sizeof(DT),
-                                cudaHostAllocDefault));
-		gpuErrchk(cudaHostAlloc(&diag_h[i],
-                                TILE_SIZE*sizeof(DT),
-                                cudaHostAllocDefault));
-        }
-	
-	log("Check 2");
-
-	cublasHandle_t cublasH;	
-
-	int row=0,col=0;
-
-	while(row < num_tiles){
-		col = 0;
-		while(col < num_tiles){
-			int ret_col = col;
-			for(int i=0;i<NUM_STREAMS;i++){
-				if(col > num_tiles){
-					break;
-				}
-				std::cout<<"Working on block: "<<row * col<<std::endl;
-				make_tile(A, tile_h[(row * col) % NUM_STREAMS], m, n, TILE_SIZE, TILE_SIZE, row, col);
-				log("Check 3");
-					
-				gpuErrchk(cudaMemcpyAsync(tile_d[(row * col) % NUM_STREAMS],
-							tile_h[(row * col) % NUM_STREAMS],
-							TILE_SIZE * TILE_SIZE * sizeof(DT),
-							cudaMemcpyHostToDevice,
-							streams[i]));
-				gpuErrchk(cudaMemcpyAsync(diag_d[row % NUM_STREAMS],
-							diag_h + (row * TILE_SIZE),
-							TILE_SIZE * sizeof(DT),
-							cudaMemcpyHostToDevice,
-							streams[i]));
-				log("Check 4");
-				cublasSetStream(cublasH, streams[i]);
-				
-				log("Check 5");
-				cublasSdgmm(cublasH, CUBLAS_SIDE_LEFT, m, n,
-					tile_d[(row*col) % NUM_STREAMS], m,
-					diag_d[row%NUM_STREAMS],1,
-					res_d[(row*col) % NUM_STREAMS],m);
-				log("Check 6");
-				col++;
-			}
-
-			for(int i=0;i<NUM_STREAMS;i++){
-				if(ret_col > num_tiles){
-					break;
-				}
-				cudaStreamSynchronize(streams[i]);
-
-				gpuErrchk(cudaMemcpyAsync(res_h[(row * ret_col) % NUM_STREAMS],
-							res_d[(row * ret_col) % NUM_STREAMS],
-							TILE_SIZE * TILE_SIZE * sizeof(DT),
-							cudaMemcpyHostToDevice,
-							streams[i]));
-				copy_tile(C, res_h[(row*ret_col) % NUM_STREAMS],m,n, TILE_SIZE, TILE_SIZE, row, ret_col);
-				ret_col++;
-
-			}	
-		}
-		row++;
-	}
-
-
-}
 
 void mkl_sparse_multiply(csr *A, csr *B, csr *C,int  m, int n, int k){
 	sparse_matrix_t A_handle, B_handle, C_handle;
@@ -198,26 +43,6 @@ void mkl_sparse_multiply(csr *A, csr *B, csr *C,int  m, int n, int k){
 		       &C->h_colIndices, &C->h_values);
 
 }
-
-//void copy_mkl_csr(csr *A, csr *B, int rows){
-//	std::memcpy(B->h_rowIndices, A->h_rowIndices, rows * sizeof(int));
-//	std::memcpy(B->h_rowEndIndices, A->h_rowEndIndices, rows * sizeof(int));
-//	std::memcpy(B->h_colIndices, A->h_colIndices, A.nnz * sizeof(int));
-//	std::memcpy(B->h_values, A->h_values, A.nnz * sizeof(DT));
-//}
-
-void allocate_mkl_csr(csr *A,int nnz, int rows){
-	A->h_rowIndices	= (int *) malloc(rows * sizeof(int));
-	A->h_rowEndIndices = (int *) malloc(rows * sizeof(int));
-	A->h_colIndices = (int *) malloc(nnz * sizeof(int));
-	A->h_values = (DT *) malloc(nnz * sizeof(DT));
-}
-
-//struct matrix_descr{
-//	sparse_matrix_type_t type;
-//	sparse_fill_mode_t mode;
-//	sparse_diag_type_t diag;
-//}mkl_descr;	
 
 
 int main(int argc, char *argv[]){
