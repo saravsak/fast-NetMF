@@ -45,20 +45,16 @@ void write_embeddings(const char * fileName, double **embeddings, int size, int 
 }
 void write_profile(const char * fileName, info profile){
 	std::ofstream op;
-	double tot = profile.iptime.count()
-			+ profile.init.count()
-			+ profile.gpuio.count()
-			+ profile.compute_d.count()
-			+ profile.compute_x.count()
-			+ profile.compute_s.count()
-			+ profile.compute_m.count()
-			+ profile.svd.count()
-			+ profile.emb.count();
+	double tot = profile.tot.count() * 0.001;
+	double svd = profile.svd.count() * 0.001;
+	double normalization = profile.normalization.count() * 0.001;
+	double compute_s = profile.compute_s.count() * 0.001;
+	double compute_m = profile.compute_m.count() * 0.001;
 	
 	if(!check_file(fileName)){
 		std::cout<<"File does not exist. Creating file"<<std::endl;
 		op.open(fileName, std::ofstream::out);
-		op<<"dataset,algo,dimension,window size,i/p,init,gpuio,D, X, S, M,SVD, Emb, total"<<std::endl;
+		op<<"dataset,algo,dimension,window size, normalization, S, M, factorization, total"<<std::endl;
 	}else{
 		op.open(fileName, std::ofstream::app);
 	}
@@ -68,16 +64,11 @@ void write_profile(const char * fileName, info profile){
 		<<profile.algo<<","
 		<<profile.dimension<<","
 		<<profile.window_size<<","
-		<<profile.iptime.count()<<","
-		<<profile.init.count()<<","
-		<<profile.gpuio.count()<<","
-		<<profile.compute_d.count()<<","
-		<<profile.compute_x.count()<<","
-		<<profile.compute_s.count()<<","
-		<<profile.compute_m.count()<<","
-		<<profile.svd.count()<<","
-		<<profile.emb.count()<<","
-		<<tot<<std::endl;	
+		<<normalization<<","
+		<<compute_s<<","
+		<<compute_m<<","
+		<<svd<<","
+		<<tot<<std::endl;
 	op.close();
 }
 Graph read_graph(std::string filename, std::string format, const char *mapping_filename){

@@ -1,10 +1,12 @@
-GPU_ARCH 	:= -arch=sm_61
-ROOT		:= /home/sk
+GPU_ARCH 	:= -arch=sm_70
+#ROOT		:= /home/sk
+ROOT		:= /home/shanmugamsakthivadivel.1
 
 CXX		:= icc
 CXXFLAGS	:= -O3 -march=native -std=c++11 -fPIC -qopenmp -mkl -g
 
-ICCROOT		:= /opt/intel/system_studio_2019/compilers_and_libraries/linux
+#ICCROOT		:= /opt/intel/system_studio_2019/compilers_and_libraries/linux
+ICCROOT		:= /opt/intel/compilers_and_libraries/linux
 ICCINCLUDE	:= $(ICCROOT)/include
 ICCLIB		:= $(ICCROOT)/lib/intel64_lin
 ICCINC		:= $(ICCLIB)/libirc.a,$(ICCLIB)/libiomp5.so
@@ -14,9 +16,17 @@ MKLINCLUDE 	:= $(MKLROOT)/include
 MKLLIB 		:= $(MKLROOT)/lib/intel64_lin
 MKLICC		:= $(MKLLIB)/libmkl_intel_lp64.a,$(MKLLIB)/libmkl_sequential.a,$(MKLLIB)/libmkl_core.a,$(ICCINC),-lpthread
 
+NVCC_HOME     	:= /usr/local/cuda-9.2
+CUDA_INC        := -I$(NVCC_HOME)/include
+CUDA_LIB        := -L$(NVCC_HOME)/lib64 -lcudart -lcublas -lcusparse
+
+
 NVCC		:= nvcc
 NVCCFLAGS 	:= -O3 -w $(GPUARCH) --std=c++11 -m64 -rdc=true -Xptxas -dlcm=ca -Xcompiler -fopenmp -g
 NVCCLINK	:= -lcublas -lcusolver -lcusparse -lcudart
+
+NMFROOT		:= ../lib/nmf
+NMF		:= $(NMFROOT)/utils.o $(NMFROOT)/update_kernel.o $(NMFROOT)/model.o
 
 OBJS		:= utils.o graph.o io.o
 
@@ -26,8 +36,6 @@ OBJS		:= utils.o graph.o io.o
 #MKLLINKFLAGS:= --linker-options $(MKLICC)
 #ICCLINK		:= -l$(MKLLIB)/libmkl_intel_lp64.a -l$(MKLLIB)/libmkl_sequential.a -l$(MKLLIB)/libmkl_core.a -l$(ICCINC) -lpthread
 
-NMFROOT:=../lib/nmf
-NMF:=$(NMFROOT)/nmf-utils.o $(NMFROOT)/update_kernel.o $(NMFROOT)/model.o
 
 
 all: gpu cpu
@@ -41,22 +49,22 @@ large: large_gpu large_cpu
 small: small_dense_gpu small_sparse_gpu small_dense_cpu small_sparse_cpu 
 
 small_dense_gpu: netmf_small_dense_hybrid.cu $(OBJS)
-	$(NVCC) $(NVCCFLAGS) -o small_dense_gpu $< $(OBJS) $(NVCCLINK) -I $(MKLINCLUDE) --linker-options $(MKLICC)
+	$(NVCC) $(NVCCFLAGS) -o small_dense_gpu $< $(OBJS) $(NMF) $(NVCCLINK) -I $(MKLINCLUDE) --linker-options $(MKLICC)
 
 small_sparse_gpu: netmf_small_sparse_hybrid.cu $(OBJS)
-	$(NVCC) $(NVCCFLAGS) -o small_sparse_gpu $< $(OBJS) $(NVCCLINK) -I $(MKLINCLUDE) --linker-options $(MKLICC)
+	$(NVCC) $(NVCCFLAGS) -o small_sparse_gpu $< $(OBJS) $(NMF) $(NVCCLINK) -I $(MKLINCLUDE) --linker-options $(MKLICC)
 
 large_gpu: netmf_large_dense_hybrid.cu $(OBJS)
 	${NVCC} ${NVCCFLAGS} -o large_dense_gpu $< $(OBJS) $(NVCCLINK) -I $(MKLINCLUDE) --linker-options $(MKLICC)
 
 small_dense_cpu: netmf_small_dense_mkl.cpp $(OBJS)
-	${CXX} ${CXXFLAGS} -o small_dense_cpu $< $(OBJS) -I $(MKLINCLUDE) 
+	${CXX} ${CXXFLAGS} -o small_dense_cpu $< $(OBJS) $(NMF) -I $(MKLINCLUDE) $(CUDA_INC) $(CUDA_LIB) 
 
 small_sparse_cpu: netmf_small_sparse_mkl.cpp $(OBJS)
-	${CXX} ${CXXFLAGS} -o small_sparse_cpu $< $(OBJS) -I $(MKLINCLUDE)
+	${CXX} ${CXXFLAGS} -o small_sparse_cpu $< $(OBJS) $(NMF) -I $(MKLINCLUDE) $(CUDA_INC) $(CUDA_LIB) 
 
 large_cpu: netmf_large_dense_mkl.cpp $(OBJS)
-	${CXX} ${CXXFLAGS} -o large_dense_cpu $< $(OBJS) -I $(MKLINCLUDE)
+	${CXX} ${CXXFLAGS} -o large_dense_cpu $< $(OBJS) -I $(MKLINCLUDE) -L $(MKLLIB)
 
 utils.o: ../utils/utils.cpp ../utils/utils.h
 	${CXX} ${CXXFLAGS} -c $< -o utils.o

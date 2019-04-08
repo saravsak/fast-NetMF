@@ -12,15 +12,13 @@ struct info {
 	const char * algo;
 	DT dimension;
 	DT window_size;
+	const char * mode;
 	milliseconds iptime;
-	milliseconds init;
-	milliseconds gpuio;
-	milliseconds compute_d;
-	milliseconds compute_x;
+	milliseconds normalization;
 	milliseconds compute_s;
 	milliseconds compute_m;
 	milliseconds svd;
-	milliseconds emb;
+	milliseconds tot;
 };
 
 void log(const char* message);

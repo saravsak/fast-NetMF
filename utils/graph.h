@@ -33,7 +33,7 @@ struct csr{
 class Graph
 {
 	public:
-		int size;
+		unsigned long long int size;
 		int num_edges;
 		DT volume;
 
