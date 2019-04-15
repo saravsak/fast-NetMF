@@ -54,7 +54,7 @@ void write_profile(const char * fileName, info profile){
 	if(!check_file(fileName)){
 		std::cout<<"File does not exist. Creating file"<<std::endl;
 		op.open(fileName, std::ofstream::out);
-		op<<"dataset,algo,dimension,window size, normalization, S, M, factorization, total"<<std::endl;
+		op<<"dataset,algo,mode, dimension,window size, normalization, S, M, factorization, total"<<std::endl;
 	}else{
 		op.open(fileName, std::ofstream::app);
 	}
@@ -62,6 +62,7 @@ void write_profile(const char * fileName, info profile){
 
 	op<<profile.dataset<<","
 		<<profile.algo<<","
+		<<profile.mode<<","
 		<<profile.dimension<<","
 		<<profile.window_size<<","
 		<<normalization<<","

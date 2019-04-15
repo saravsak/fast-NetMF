@@ -220,7 +220,7 @@ int main ( int argc, char **argv ){
 		diag_ev[i*rank + i] = evals[i];
 	}
 
-	DT M = (DT *) malloc(g.size * rank * sizeof(DT));	
+	DT *M = (DT *) malloc(g.size * rank * sizeof(DT));	
 
 	cblas_sgemm(CblasNoTrans, CblasNoTrans,
 			g.size, rank, rank,

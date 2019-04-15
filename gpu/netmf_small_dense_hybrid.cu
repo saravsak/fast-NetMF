@@ -23,7 +23,7 @@
 #include<mkl_spblas.h>
 #include<vector>
 
-#define DEBUG false
+#define DEBUG true
 #define VERBOSE false
 
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
@@ -317,6 +317,7 @@ void multiply_csr(csr *A, csr *B, csr *C, int m, int n, int k, cusparseHandle_t 
 }
 
 int main (int argc, char *argv[] ){
+	cudaDeviceReset();
 	/**************
  	* NetMF small *
 	**************/
@@ -334,6 +335,10 @@ int main (int argc, char *argv[] ){
 	typedef std::chrono::milliseconds milliseconds;
         Clock::time_point svd_begin, svd_end;
         Clock::time_point overall_begin, overall_end;
+        Clock::time_point ip_begin, ip_end;
+        Clock::time_point norm_begin, norm_end;
+        Clock::time_point s_begin, s_end;
+        Clock::time_point m_begin, m_end;
 	info profile; 
 	overall_begin = Clock::now();
 
@@ -346,10 +351,14 @@ int main (int argc, char *argv[] ){
 	profile.algo = "small-dense-gpu";
 	profile.window_size = window_size;
 	profile.dimension = dimension;
+	profile.mode = argv[7];
 
 	/* Load graph */
         log("Reading data from file");
+	ip_begin = Clock::now();	
 	Graph g =  read_graph(argv[5],"dense", argv[7]);
+	ip_end = Clock::now();
+	profile.iptime = std::chrono::duration_cast<milliseconds>(ip_end - ip_begin);
 
 	/* CUDA housekeeping */
 	float num_threads = 128;
@@ -392,24 +401,24 @@ int main (int argc, char *argv[] ){
 
 	/* Step 2: Allocate space for adjacency and degree matrix on device*/
 	log("Allocating space for degree and adjacency mat on device");
-	cudaMalloc(&adj_device_dense, 
-			g.size * g.size * sizeof(DT)); 	
-	cudaMalloc(&degree_device_dense, 
-			g.size * sizeof(DT)); 
+	gpuErrchk(cudaMalloc(&adj_device_dense, 
+			g.size * g.size * sizeof(DT))); 	
+	gpuErrchk(cudaMalloc(&degree_device_dense, 
+			g.size * sizeof(DT))); 
 
 	/* Step 2a: Allocate space for adjacency and degree matrix on host */
 	log("Allocating space for degree and adjacency matrix on host");
 
 	/* Step 3: Copy dense matrix from host to device */
 	log("Copying dense matrix from host to device");	
-	cudaMemcpy(adj_device_dense, 
+	gpuErrchk(cudaMemcpy(adj_device_dense, 
 			g.adj, 
 			g.size * g.size * sizeof(DT), 
-			cudaMemcpyHostToDevice);	
-	cudaMemcpy(degree_device_dense, 
+			cudaMemcpyHostToDevice));	
+	gpuErrchk(cudaMemcpy(degree_device_dense, 
 			g.degree, 
 			g.size * sizeof(DT), 
-			cudaMemcpyHostToDevice);
+			cudaMemcpyHostToDevice));
 	log("Moved data from host to device");
 
 	/* Section 2: Compute X = D^{-1/2} * A * D^{-1/2} */
@@ -420,6 +429,7 @@ int main (int argc, char *argv[] ){
 	*/
 	
 	/* Step 1: Compute D' = D^{-1/2} */
+	norm_begin = Clock::now();
 	log("Computing normalized D");
 	compute_d<<<grids, threads>>>(degree_device_dense, g.size);
 	gpuErrchk(cudaPeekAtLastError());
@@ -431,6 +441,7 @@ int main (int argc, char *argv[] ){
 
 	cudaMalloc(&X_temp_device, g.size * g.size * sizeof(DT));
 	cudaMemset(X_temp_device, 0, g.size * g.size);
+	gpuErrchk(cudaPeekAtLastError());
 
 	cublasSdgmm(cublas_handle, CUBLAS_SIDE_LEFT,
 		g.size, g.size,
@@ -438,6 +449,7 @@ int main (int argc, char *argv[] ){
 		degree_device_dense, 1,
 		X_temp_device, g.size);
 	cudaDeviceSynchronize();
+	gpuErrchk(cudaPeekAtLastError());
 
 	/* Step 3: Compute X = X' * D */
 	log("Computing X = X' * D");
@@ -445,17 +457,22 @@ int main (int argc, char *argv[] ){
 	
 	cudaMalloc(&X_device, g.size * g.size * sizeof(DT));
 	cudaMemset(X_device, 0, g.size * g.size);
+	gpuErrchk(cudaPeekAtLastError());
 
 	cublasSdgmm(cublas_handle, CUBLAS_SIDE_RIGHT,
 		g.size, g.size,
 		X_temp_device, g.size, 
 		degree_device_dense, 1,
 		X_device, g.size);
+	gpuErrchk(cudaPeekAtLastError());
 	
 	cudaDeviceSynchronize();	
 	cudaFree(X_temp_device);
 	cudaFree(adj_device_dense);
-
+	norm_end = Clock::now();
+	profile.normalization = std::chrono::duration_cast<milliseconds>(norm_end - norm_begin);
+	gpuErrchk(cudaPeekAtLastError());
+	
 	/* Section 3: Compute S = sum(X^{0}....X^{window_size}) */
 	/* Procedure
 	  1. Copy X to S
@@ -467,6 +484,7 @@ int main (int argc, char *argv[] ){
 	*/
 	
 	/* Step 0: Declare all variables */
+	s_begin = Clock::now();
 	DT *S_device;
 	DT *W_device;
 	DT *S_temp_device;
@@ -478,20 +496,19 @@ int main (int argc, char *argv[] ){
 	/* Step 1: Copy X to S */
 	log("Copying X to S");
 
-	cudaMalloc(&S_temp_device, g.size * g.size * sizeof(DT));
 	cudaMalloc(&S_device, g.size * g.size *sizeof(DT));
 	cudaMemcpy(S_device, X_device, g.size * g.size * sizeof(DT), cudaMemcpyDeviceToDevice);
 
 	/* Step 2: Copy X to temp */
 	log("Copying X to W");
 	
-	cudaMalloc(&W_temp_device, g.size * g.size * sizeof(DT));
 	cudaMalloc(&W_device, g.size * g.size *sizeof(DT));
 	cudaMemcpy(W_device, X_device, g.size * g.size * sizeof(DT), cudaMemcpyDeviceToDevice);
 
 	for(int i=2;i<=window_size;i++){
 		/* Step 3: temp' = temp * X */
 		log("Computing W' = W * X");
+		cudaMalloc(&W_temp_device, g.size * g.size * sizeof(DT));
 		cudaMemset(W_temp_device, 0, g.size * g.size);
 		beta = 0;
 		cublasSgemm(cublas_handle, 
@@ -502,9 +519,16 @@ int main (int argc, char *argv[] ){
 				X_device, LDA,
 				&beta,
 				W_temp_device, LDA);
+		
+		/* Step 5: temp = temp' */
+		log("Copying W' to W");
+		cudaMemset(W_device, 0, g.size * g.size);
+		cudaMemcpy(W_device, W_temp_device, g.size * g.size * sizeof(DT), cudaMemcpyDeviceToDevice);
+		cudaFree(W_temp_device);
 
 		/* Step 4: S = S + temp */
 		log("Computing S' = S + W'");
+		cudaMalloc(&S_temp_device, g.size * g.size * sizeof(DT));
 		cudaMemset(S_temp_device, 0, g.size * g.size);
 		beta = 1;
 		cublasSgeam(cublas_handle,
@@ -513,22 +537,21 @@ int main (int argc, char *argv[] ){
 				&alpha,
 				S_device, LDA,
 				&beta,
-				W_temp_device, LDA,
+				W_device, LDA,
 				S_temp_device, LDA);
 
-		/* Step 5: temp = temp' */
-		log("Copying W' to W");
-		cudaMemset(W_device, 0, g.size * g.size);
-		cudaMemcpy(W_device, W_temp_device, g.size * g.size * sizeof(DT), cudaMemcpyDeviceToDevice);
 
 		/* Step 6: S = S' */
 		log("Copying S' to S");
 		cudaMemset(S_device, 0, g.size * g.size);
 		cudaMemcpy(S_device, S_temp_device, g.size * g.size * sizeof(DT), cudaMemcpyDeviceToDevice);
+		cudaFree(S_temp_device);
+		gpuErrchk(cudaPeekAtLastError());
+
 	}
 
-	cudaFree(S_temp_device);
-	cudaFree(W_temp_device);
+	//cudaFree(S_temp_device);
+	//cudaFree(W_temp_device);
 	cudaFree(W_device);
 
         /* Section 4: Compute S = S * (vol / (window_size * b)) */
@@ -548,6 +571,10 @@ int main (int argc, char *argv[] ){
                     &val,
                     S_device, 1);
 
+	s_end = Clock::now();
+	profile.compute_s = std::chrono::duration_cast<milliseconds>(s_end - s_begin);
+	
+
 	log("Computing M");
         /* Section 5: Compute M = D^{-1/2} * S * D^{-1/2} */
 	/* Procedure
@@ -557,7 +584,7 @@ int main (int argc, char *argv[] ){
 
 	/* Step 1: Compute M' = D' * S */
 	log("Computing M' = D' * S");
-
+	m_begin = Clock::now();
 	DT *M_temp_device;
 
 	cudaMalloc(&M_temp_device, g.size * g.size * sizeof(DT));
@@ -597,9 +624,10 @@ int main (int argc, char *argv[] ){
        	cudaDeviceSynchronize(); 
 
 	log("Pruned M");
+	m_end = Clock::now();
+	profile.compute_m = std::chrono::duration_cast<milliseconds>(m_end - m_begin);
 
 	if(!strcmp(argv[7], "SVD")){
-		svd_begin = Clock::now();
 		/* Step 2: Create CSR struct for both matrices */
 		log("Converting dense matrix to CSR format");	
 		csr M_cap;    /* Variable to hold adjacency matrix in CSR format */
@@ -715,6 +743,7 @@ int main (int argc, char *argv[] ){
 		memset(res_mkl, 0 , k0);
 	
 		int mkl_status = 0;
+		svd_begin = Clock::now();
 	
 		log("Computing SVD via MKL");
 		mkl_status = mkl_sparse_s_svd(&whichS, &whichV, pm,
@@ -801,7 +830,7 @@ int main (int argc, char *argv[] ){
 		nmf_argv[8] = (char *) temp.c_str();
 		log("Set Prameters");
 		nmf_argv[9] = "-niters";
-		nmf_argv[10] = "500";
+		nmf_argv[10] = "10";
 
 		log("Set Prameters");
 		nmf.init(nmf_argc,nmf_argv);
@@ -823,13 +852,17 @@ int main (int argc, char *argv[] ){
 
 		for(int i=0;i<nmf_argc;i++)
 		std::cout<<"P"<<i<<": "<<nmf_argv[i]<<std::endl;
+		svd_begin = Clock::now();
 
 		nmf.estimate_HALS_GPU(M_doub);
-
+		svd_end = Clock::now();
+		profile.svd = std::chrono::duration_cast<milliseconds>(svd_end - svd_begin);
+			
 		write_embeddings(argv[6], nmf.WT, g.size, dimension);	
 		
 	}
 	overall_end = Clock::now();
 	profile.tot = std::chrono::duration_cast<milliseconds>(overall_end - overall_begin);
-	write_profile("test_profile.txt", profile);
+	write_profile("profile.txt", profile);
+	cudaDeviceReset();
 }

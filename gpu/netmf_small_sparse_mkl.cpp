@@ -89,6 +89,7 @@ int main(int argc, char *argv[]){
 	profile.algo = "small-sparse-cpu";
 	profile.window_size = window_size;
 	profile.dimension = dimension;
+	profile.mode = argv[7];
 
 	/* Read graph */
 	log("Reading data from file");
@@ -246,7 +247,6 @@ int main(int argc, char *argv[]){
 
 	/* Convert M'' to sparse */
 	if(!strcmp(arg_type, "SVD")){
-		svd_begin = Clock::now();
 		log("Converting M to sparse");
 		unsigned long long int nnz = 0;
 			for(unsigned long long int i=0;i<num_nodes * num_nodes; i++){
@@ -324,6 +324,7 @@ int main(int argc, char *argv[]){
 		int mkl_status = 0;
 
 		log("Computing SVD via MKL");
+		svd_begin = Clock::now();
         	mkl_status = mkl_sparse_s_svd(&whichS, &whichV, pm,
         	                M_cap, descrM,
         	                k0, &k,
@@ -367,7 +368,7 @@ int main(int argc, char *argv[]){
 		//mkl_simatcopy('R', 'T', g.size, dimension, 1.00, embeddings, dimension, g.size);
 		/* Save Embeddings */
 		svd_end = Clock::now();	
-		profile.tot = std::chrono::duration_cast<milliseconds>(svd_end - svd_begin);
+		profile.svd = std::chrono::duration_cast<milliseconds>(svd_end - svd_begin);
 		
 		write_embeddings(arg_output, embeddings, g.size, dimension);
 	}
@@ -395,7 +396,7 @@ int main(int argc, char *argv[]){
 		nmf_argv[8] = (char *) temp.c_str();
 		log("Set Prameters");
 		nmf_argv[9] = "-niters";
-		nmf_argv[10] = "100";
+		nmf_argv[10] = "10";
 
 		log("Set Prameters");
 		nmf.init(nmf_argc,nmf_argv);
@@ -415,7 +416,10 @@ int main(int argc, char *argv[]){
 		for(int i=0;i<nmf_argc;i++)
 		std::cout<<"P"<<i<<": "<<nmf_argv[i]<<std::endl;
 
+		svd_begin = Clock::now();	
 		nmf.estimate_HALS_CPU(M_doub);
+		svd_end = Clock::now();	
+		profile.svd = std::chrono::duration_cast<milliseconds>(svd_end - svd_begin);
 
 		write_embeddings(argv[6], nmf.WT, g.size, dimension);	
 	
@@ -424,6 +428,4 @@ int main(int argc, char *argv[]){
 	overall_end = Clock::now();
 	profile.tot = std::chrono::duration_cast<milliseconds>(overall_end - overall_begin);
 	write_profile("profile.txt", profile);
-	
-
 }

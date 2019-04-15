@@ -9,3 +9,7 @@ data/
 lib/*
 embeddings/*
 mapping/*
+*.out
+*.o
+*.txt
+*.csv

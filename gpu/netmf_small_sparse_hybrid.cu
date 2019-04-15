@@ -20,7 +20,7 @@
 #include<mkl_spblas.h>
 #include<vector>
 
-#define DEBUG true
+#define DEBUG false
 #define VERBOSE false
 
 
@@ -305,6 +305,7 @@ void multiply_csr(csr *A, csr *B, csr *C, int m, int n, int k, cusparseHandle_t 
 }
 
 int main ( int argc, char** argv  ){
+	cudaDeviceReset();
 	/**************
  	* NetMF small *
 	**************/
@@ -321,6 +322,10 @@ int main ( int argc, char** argv  ){
 	typedef std::chrono::milliseconds milliseconds;
         Clock::time_point svd_begin, svd_end;
         Clock::time_point overall_begin, overall_end;
+        Clock::time_point ip_begin, ip_end;
+        Clock::time_point norm_begin, norm_end;
+        Clock::time_point s_begin, s_end;
+        Clock::time_point m_begin, m_end;
 	info profile; 
 	overall_begin = Clock::now();
 
@@ -332,11 +337,15 @@ int main ( int argc, char** argv  ){
 	profile.algo = "small-sparse-gpu";
 	profile.window_size = window_size;
 	profile.dimension = dimension;
+	profile.mode = argv[7];
 
 	/* Load graph */
         log("Reading data from file");
 	
+	ip_begin = Clock::now();	
 	Graph g =  read_graph(argv[5],"csr", argv[7]);
+	ip_end = Clock::now();
+	profile.iptime = std::chrono::duration_cast<milliseconds>(ip_end - ip_begin);
 
 	cudaMalloc(&g.degree_csr.d_rowIndices, (g.size + 1) * sizeof(int));
 	cudaMalloc(&g.degree_csr.d_colIndices, (g.degree_csr.nnz) * sizeof(int));
@@ -399,7 +408,8 @@ int main ( int argc, char** argv  ){
 	   2. Compute X' = D' * A
 	   3. Compute X = X' * D'
 	*/
-	
+
+	norm_begin = Clock::now();	
 	/* Step 1: Compute D' = D^{-1/2} */
 	log("Computing normalized D");
 	compute_d<<<grids, threads>>>(g.degree_csr.d_values, g.degree_csr.nnz);
@@ -475,7 +485,9 @@ int main ( int argc, char** argv  ){
 		if(VERBOSE)
 			{print_csr(g.size, X.nnz, X, "X = X' * A");}
 	}
-	
+	norm_end = Clock::now();
+	profile.normalization = std::chrono::duration_cast<milliseconds>(norm_end - norm_begin);
+		
 	/* Section 3: Compute S = sum(X^{0}....X^{window_size}) */
 	/* Procedure
 	  1. Copy X to S
@@ -485,7 +497,7 @@ int main ( int argc, char** argv  ){
 	  5. temp = temp'
 	  6. S = S'
 	*/
-	
+	s_begin = Clock::now();	
 	/* Step 0: Declare all variables */
 	csr S;
 	csr temp;
@@ -588,6 +600,10 @@ int main ( int argc, char** argv  ){
 		}
 	}
 
+	s_end = Clock::now();
+	profile.compute_s = std::chrono::duration_cast<milliseconds>(s_end - s_begin);
+
+	m_begin = Clock::now();
 	log("Computing M");
 
         /* Section 5: Compute M = D^{-1/2} * S * D^{-1/2} */
@@ -753,10 +769,11 @@ int main ( int argc, char** argv  ){
 	
 	
 	device2host(&M_cap, M_cap.nnz, g.size);
+	m_end = Clock::now();
+	profile.compute_m = std::chrono::duration_cast<milliseconds>(m_end - m_begin);
 
 	/* Step 4: Convert CSR matrix to CSR matrix */
 	if(!strcmp(arg_type, "SVD")){
-		svd_begin = Clock::now();
 		std::cout<<"NNZ in M_cap: "<<M_cap.nnz<<std::endl;
 		if(VERBOSE){
 			print_csr(g.size,
@@ -840,6 +857,7 @@ int main ( int argc, char** argv  ){
 	
 		int mkl_status = 0;
 	
+		svd_begin = Clock::now();
 		log("Computing SVD via MKL");
 		mkl_status = mkl_sparse_s_svd(&whichS, &whichV, pm,
 				M_mkl, mkl_descrM,
@@ -921,7 +939,7 @@ int main ( int argc, char** argv  ){
 		nmf_argv[8] = (char *) temp.c_str();
 		log("Set Prameters");
 		nmf_argv[9] = "-niters";
-		nmf_argv[10] = "5";
+		nmf_argv[10] = "10";
 
 		log("Set Prameters");
 		nmf.init(nmf_argc,nmf_argv);
@@ -962,8 +980,11 @@ int main ( int argc, char** argv  ){
 		for(int i=0;i<nmf_argc;i++)
 		std::cout<<"P"<<i<<": "<<nmf_argv[i]<<std::endl;
 
+		svd_begin = Clock::now();
 		nmf.estimate_HALS_GPU(M_doub);
-
+		svd_end = Clock::now();
+		profile.svd = std::chrono::duration_cast<milliseconds>(svd_end - svd_begin);
+		
 		write_embeddings(argv[6], nmf.WT, g.size, dimension);	
 		
 	}
@@ -972,5 +993,5 @@ int main ( int argc, char** argv  ){
 		
 	write_profile("profile.txt", profile);
 	
-
+	cudaDeviceReset();
 }
