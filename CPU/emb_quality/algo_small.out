@@ -1,0 +1,176 @@
+2019-05-01 21:51:42,796 Loading label from /home/jangid.6/work/datasets/ppi/ppi.mat...
+2019-05-01 21:51:42,797 loading mat file /home/jangid.6/work/datasets/ppi/ppi.mat
+2019-05-01 21:51:42,801 Label loaded!
+2019-05-01 21:51:42,801 Loading network embedding from /home/jangid.6/work/datasets/ppi/ppi_sparse_spectra_algo_small_win1_emdDim256_numThreads16_r1.embedding...
+2019-05-01 21:51:43,177 Network embedding loaded!
+/home/jangid.6/work/py2_venv/lib/python2.7/site-packages/sklearn/multiclass.py:76: UserWarning: Label not 24 is present in all training examples.
+  str(classes[c]))
+2019-05-01 21:51:47,901 micro f1 0.127435 macro f1 0.081801
+2019-05-01 21:51:48,234 micro f1 0.134758 macro f1 0.101401
+2019-05-01 21:51:48,552 micro f1 0.149544 macro f1 0.109012
+2019-05-01 21:51:48,883 micro f1 0.150059 macro f1 0.108729
+/home/jangid.6/work/py2_venv/lib/python2.7/site-packages/sklearn/multiclass.py:76: UserWarning: Label not 11 is present in all training examples.
+  str(classes[c]))
+2019-05-01 21:51:49,208 micro f1 0.136880 macro f1 0.100638
+2019-05-01 21:51:49,208 5 fold validation, training ratio 0.100000
+2019-05-01 21:51:49,208 Average micro 13.97, Average macro 10.03
+2019-05-01 21:51:49,674 micro f1 0.201588 macro f1 0.160371
+2019-05-01 21:51:50,152 micro f1 0.194386 macro f1 0.167798
+2019-05-01 21:51:50,618 micro f1 0.207317 macro f1 0.165669
+2019-05-01 21:51:51,092 micro f1 0.209204 macro f1 0.173504
+2019-05-01 21:51:51,569 micro f1 0.196156 macro f1 0.168584
+2019-05-01 21:51:51,569 5 fold validation, training ratio 0.500000
+2019-05-01 21:51:51,570 Average micro 20.17, Average macro 16.72
+2019-05-01 21:51:52,399 micro f1 0.232339 macro f1 0.210472
+2019-05-01 21:51:53,252 micro f1 0.212166 macro f1 0.177844
+2019-05-01 21:51:54,105 micro f1 0.215361 macro f1 0.181037
+2019-05-01 21:51:54,944 micro f1 0.219365 macro f1 0.191095
+2019-05-01 21:51:55,801 micro f1 0.224638 macro f1 0.184609
+2019-05-01 21:51:55,801 5 fold validation, training ratio 0.900000
+2019-05-01 21:51:55,801 Average micro 22.08, Average macro 18.90
+2019-05-01 21:51:56,227 Loading label from /home/jangid.6/work/datasets/ppi/ppi.mat...
+2019-05-01 21:51:56,228 loading mat file /home/jangid.6/work/datasets/ppi/ppi.mat
+2019-05-01 21:51:56,231 Label loaded!
+2019-05-01 21:51:56,231 Loading network embedding from /home/jangid.6/work/datasets/ppi/ppi_dense_eigen_algo_small_win1_emdDim256_numThreads16_r1.embedding...
+2019-05-01 21:51:56,599 Network embedding loaded!
+/home/jangid.6/work/py2_venv/lib/python2.7/site-packages/sklearn/multiclass.py:76: UserWarning: Label not 24 is present in all training examples.
+  str(classes[c]))
+2019-05-01 21:52:01,240 micro f1 0.147414 macro f1 0.107511
+2019-05-01 21:52:01,555 micro f1 0.150404 macro f1 0.124211
+2019-05-01 21:52:01,865 micro f1 0.169990 macro f1 0.137421
+2019-05-01 21:52:02,112 micro f1 0.161602 macro f1 0.126254
+/home/jangid.6/work/py2_venv/lib/python2.7/site-packages/sklearn/multiclass.py:76: UserWarning: Label not 11 is present in all training examples.
+  str(classes[c]))
+2019-05-01 21:52:02,412 micro f1 0.155006 macro f1 0.128812
+2019-05-01 21:52:02,412 5 fold validation, training ratio 0.100000
+2019-05-01 21:52:02,412 Average micro 15.69, Average macro 12.48
+2019-05-01 21:52:02,927 micro f1 0.223580 macro f1 0.189104
+2019-05-01 21:52:03,425 micro f1 0.218231 macro f1 0.194040
+2019-05-01 21:52:03,939 micro f1 0.220732 macro f1 0.187490
+2019-05-01 21:52:04,453 micro f1 0.221011 macro f1 0.197200
+2019-05-01 21:52:04,952 micro f1 0.221477 macro f1 0.197823
+2019-05-01 21:52:04,952 5 fold validation, training ratio 0.500000
+2019-05-01 21:52:04,953 Average micro 22.10, Average macro 19.31
+2019-05-01 21:52:05,870 micro f1 0.243328 macro f1 0.213357
+2019-05-01 21:52:06,804 micro f1 0.221068 macro f1 0.179036
+2019-05-01 21:52:07,724 micro f1 0.230422 macro f1 0.204136
+2019-05-01 21:52:08,649 micro f1 0.231467 macro f1 0.196564
+2019-05-01 21:52:09,568 micro f1 0.253623 macro f1 0.215546
+2019-05-01 21:52:09,568 5 fold validation, training ratio 0.900000
+2019-05-01 21:52:09,568 Average micro 23.60, Average macro 20.17
+2019-05-01 21:52:09,997 Loading label from /home/jangid.6/work/datasets/blog/blog.mat...
+2019-05-01 21:52:10,025 loading mat file /home/jangid.6/work/datasets/blog/blog.mat
+2019-05-01 21:52:10,030 Label loaded!
+2019-05-01 21:52:10,030 Loading network embedding from /home/jangid.6/work/datasets/blog/blog_sparse_spectra_algo_small_win1_emdDim256_numThreads16_r1.embedding...
+2019-05-01 21:52:11,033 Network embedding loaded!
+/home/jangid.6/work/py2_venv/lib/python2.7/site-packages/sklearn/multiclass.py:76: UserWarning: Label not 38 is present in all training examples.
+  str(classes[c]))
+2019-05-01 21:52:15,674 micro f1 0.289835 macro f1 0.115906
+2019-05-01 21:52:15,978 micro f1 0.288547 macro f1 0.111008
+/home/jangid.6/work/py2_venv/lib/python2.7/site-packages/sklearn/multiclass.py:76: UserWarning: Label not 38 is present in all training examples.
+  str(classes[c]))
+2019-05-01 21:52:16,293 micro f1 0.291938 macro f1 0.117730
+2019-05-01 21:52:16,613 micro f1 0.288804 macro f1 0.116919
+/home/jangid.6/work/py2_venv/lib/python2.7/site-packages/sklearn/multiclass.py:76: UserWarning: Label not 38 is present in all training examples.
+  str(classes[c]))
+2019-05-01 21:52:16,920 micro f1 0.293122 macro f1 0.116098
+2019-05-01 21:52:16,920 5 fold validation, training ratio 0.100000
+2019-05-01 21:52:16,920 Average micro 29.04, Average macro 11.55
+2019-05-01 21:52:18,026 micro f1 0.342782 macro f1 0.179525
+2019-05-01 21:52:19,102 micro f1 0.340047 macro f1 0.176332
+2019-05-01 21:52:20,230 micro f1 0.343493 macro f1 0.178408
+2019-05-01 21:52:21,338 micro f1 0.336711 macro f1 0.176228
+2019-05-01 21:52:22,442 micro f1 0.336814 macro f1 0.168785
+2019-05-01 21:52:22,442 5 fold validation, training ratio 0.500000
+2019-05-01 21:52:22,442 Average micro 34.00, Average macro 17.59
+2019-05-01 21:52:24,429 micro f1 0.366985 macro f1 0.203965
+2019-05-01 21:52:26,355 micro f1 0.357593 macro f1 0.193500
+2019-05-01 21:52:28,295 micro f1 0.332888 macro f1 0.192113
+2019-05-01 21:52:30,243 micro f1 0.353751 macro f1 0.186978
+2019-05-01 21:52:32,187 micro f1 0.347586 macro f1 0.190937
+2019-05-01 21:52:32,187 5 fold validation, training ratio 0.900000
+2019-05-01 21:52:32,187 Average micro 35.18, Average macro 19.35
+2019-05-01 21:52:32,674 Loading label from /home/jangid.6/work/datasets/blog/blog.mat...
+2019-05-01 21:52:32,704 loading mat file /home/jangid.6/work/datasets/blog/blog.mat
+2019-05-01 21:52:32,709 Label loaded!
+2019-05-01 21:52:32,709 Loading network embedding from /home/jangid.6/work/datasets/blog/blog_dense_eigen_algo_small_win1_emdDim256_numThreads16_r1.embedding...
+2019-05-01 21:52:33,756 Network embedding loaded!
+/home/jangid.6/work/py2_venv/lib/python2.7/site-packages/sklearn/multiclass.py:76: UserWarning: Label not 38 is present in all training examples.
+  str(classes[c]))
+2019-05-01 21:52:38,485 micro f1 0.331415 macro f1 0.164044
+2019-05-01 21:52:38,797 micro f1 0.324904 macro f1 0.150000
+/home/jangid.6/work/py2_venv/lib/python2.7/site-packages/sklearn/multiclass.py:76: UserWarning: Label not 38 is present in all training examples.
+  str(classes[c]))
+2019-05-01 21:52:39,121 micro f1 0.331902 macro f1 0.166260
+2019-05-01 21:52:39,430 micro f1 0.328604 macro f1 0.159741
+/home/jangid.6/work/py2_venv/lib/python2.7/site-packages/sklearn/multiclass.py:76: UserWarning: Label not 38 is present in all training examples.
+  str(classes[c]))
+2019-05-01 21:52:39,743 micro f1 0.334099 macro f1 0.162721
+2019-05-01 21:52:39,743 5 fold validation, training ratio 0.100000
+2019-05-01 21:52:39,743 Average micro 33.02, Average macro 16.06
+2019-05-01 21:52:40,898 micro f1 0.381588 macro f1 0.217915
+2019-05-01 21:52:42,042 micro f1 0.384915 macro f1 0.220825
+2019-05-01 21:52:43,200 micro f1 0.377403 macro f1 0.221863
+2019-05-01 21:52:44,353 micro f1 0.388064 macro f1 0.226351
+2019-05-01 21:52:45,522 micro f1 0.383737 macro f1 0.221760
+2019-05-01 21:52:45,522 5 fold validation, training ratio 0.500000
+2019-05-01 21:52:45,522 Average micro 38.31, Average macro 22.17
+2019-05-01 21:52:47,648 micro f1 0.398363 macro f1 0.236779
+2019-05-01 21:52:49,764 micro f1 0.405878 macro f1 0.244722
+2019-05-01 21:52:51,900 micro f1 0.375000 macro f1 0.217377
+2019-05-01 21:52:54,028 micro f1 0.391604 macro f1 0.236171
+2019-05-01 21:52:56,142 micro f1 0.390345 macro f1 0.221894
+2019-05-01 21:52:56,142 5 fold validation, training ratio 0.900000
+2019-05-01 21:52:56,142 Average micro 39.22, Average macro 23.14
+2019-05-01 21:52:56,631 Loading label from /home/jangid.6/work/datasets/microsoft/microsoft.mat...
+2019-05-01 21:52:56,634 loading mat file /home/jangid.6/work/datasets/microsoft/microsoft.mat
+2019-05-01 21:52:56,643 Label loaded!
+2019-05-01 21:52:56,643 Loading network embedding from /home/jangid.6/work/datasets/microsoft/microsoft_sparse_spectra_algo_small_win1_emdDim256_numThreads16_r1.embedding...
+2019-05-01 21:53:01,302 Network embedding loaded!
+2019-05-01 21:53:04,953 micro f1 0.226843 macro f1 0.102408
+2019-05-01 21:53:07,975 micro f1 0.226969 macro f1 0.099938
+2019-05-01 21:53:09,211 micro f1 0.224698 macro f1 0.101484
+2019-05-01 21:53:10,395 micro f1 0.226843 macro f1 0.103227
+2019-05-01 21:53:11,625 micro f1 0.229467 macro f1 0.102039
+2019-05-01 21:53:11,625 5 fold validation, training ratio 0.100000
+2019-05-01 21:53:11,625 Average micro 22.70, Average macro 10.18
+2019-05-01 21:53:13,928 micro f1 0.270836 macro f1 0.155761
+2019-05-01 21:53:16,156 micro f1 0.266385 macro f1 0.147902
+2019-05-01 21:53:18,426 micro f1 0.270291 macro f1 0.155014
+2019-05-01 21:53:20,376 micro f1 0.269019 macro f1 0.154155
+2019-05-01 21:53:22,400 micro f1 0.268611 macro f1 0.150553
+2019-05-01 21:53:22,400 5 fold validation, training ratio 0.500000
+2019-05-01 21:53:22,400 Average micro 26.90, Average macro 15.27
+2019-05-01 21:53:25,834 micro f1 0.277021 macro f1 0.157920
+2019-05-01 21:53:29,212 micro f1 0.268165 macro f1 0.159288
+2019-05-01 21:53:32,452 micro f1 0.278383 macro f1 0.157205
+2019-05-01 21:53:35,664 micro f1 0.282016 macro f1 0.164302
+2019-05-01 21:53:38,920 micro f1 0.279973 macro f1 0.154804
+2019-05-01 21:53:38,920 5 fold validation, training ratio 0.900000
+2019-05-01 21:53:38,920 Average micro 27.71, Average macro 15.87
+2019-05-01 21:53:39,556 Loading label from /home/jangid.6/work/datasets/microsoft/microsoft.mat...
+2019-05-01 21:53:39,559 loading mat file /home/jangid.6/work/datasets/microsoft/microsoft.mat
+2019-05-01 21:53:39,568 Label loaded!
+2019-05-01 21:53:39,568 Loading network embedding from /home/jangid.6/work/datasets/microsoft/microsoft_dense_eigen_algo_small_win1_emdDim256_numThreads16_r1.embedding...
+2019-05-01 21:53:44,119 Network embedding loaded!
+2019-05-01 21:53:47,967 micro f1 0.283036 macro f1 0.167404
+2019-05-01 21:53:51,252 micro f1 0.281522 macro f1 0.160526
+2019-05-01 21:53:52,519 micro f1 0.279932 macro f1 0.166479
+2019-05-01 21:53:53,843 micro f1 0.282380 macro f1 0.166993
+2019-05-01 21:53:55,244 micro f1 0.281017 macro f1 0.163214
+2019-05-01 21:53:55,244 5 fold validation, training ratio 0.100000
+2019-05-01 21:53:55,244 Average micro 28.16, Average macro 16.49
+2019-05-01 21:53:58,146 micro f1 0.332743 macro f1 0.215135
+2019-05-01 21:54:00,834 micro f1 0.324976 macro f1 0.206362
+2019-05-01 21:54:03,459 micro f1 0.327928 macro f1 0.210455
+2019-05-01 21:54:05,716 micro f1 0.327474 macro f1 0.210000
+2019-05-01 21:54:07,996 micro f1 0.325067 macro f1 0.205956
+2019-05-01 21:54:07,996 5 fold validation, training ratio 0.500000
+2019-05-01 21:54:07,996 Average micro 32.76, Average macro 20.96
+2019-05-01 21:54:12,244 micro f1 0.347866 macro f1 0.227932
+2019-05-01 21:54:16,531 micro f1 0.329927 macro f1 0.216265
+2019-05-01 21:54:20,462 micro f1 0.347639 macro f1 0.225704
+2019-05-01 21:54:24,641 micro f1 0.353542 macro f1 0.232726
+2019-05-01 21:54:28,737 micro f1 0.346049 macro f1 0.222611
+2019-05-01 21:54:28,737 5 fold validation, training ratio 0.900000
+2019-05-01 21:54:28,738 Average micro 34.50, Average macro 22.50
