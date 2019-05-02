@@ -1,14 +1,33 @@
 Discuss:
   ✔ How to know number of cpu's or cores in nodes @done (18-12-08 10:01)
   ✔ discuss 24 28 thread result @done (18-12-08 10:01)
-  ☐ the opp sign and reverse vector order comes from eigen function
-  ☐ How dod we know that embedding ouput corresponds to correct node numbers
-  ☐ what is small and large algorithm?
+  ✔ the opp sign and reverse vector order comes from eigen function @done (19-01-08 17:23)
+  ✔ How do we know that embedding ouput corresponds to correct node numbers @done (19-01-08 17:23)
+  ☐ what is small and large algorithm? T=1 and T = 10 ??
+  ✔ another hint of parallel execution -- wall vs sys time @done (19-01-08 17:23)
+
+  ✔ accuracy of Red-svd @done (19-01-08 17:23)
+  ✔ large memory request worked @done (19-02-07 10:57)
+  ✔ Is there a class like last semester? @done (19-02-07 10:57)
+  ☐ ppi dataset fix
+  ☐ ppi and Blog scoring result
+  ☐ Flickr time problem and convergence controller problem -- Where to run for more than 2 days
+  ☐ trying to make arpack-ng work https://github.com/opencollab/arpack-ng
+  ☐ Am I allowed to try amrgadillo with apt-get installation?
+  ☐ Added and formated output of embedding for more command line options to sparse matrix
+  ☐ 
+  ☐ 
+  ☐ reduce time for PPI and Blog <<-- focus on this and not on Flickr
+  ☐ 
+
+
+  Notes: 
+    ☐ 
 
   
 
 Bug: 
-    ☐ check for complementary -ve signs in output
+    ✔ check for complementary -ve signs in output @done (19-01-08 17:24)
 
 Todo:
    ✔ netmf large in approximation remove negetive values python code line @done (18-11-23 20:18)
@@ -21,25 +40,22 @@ Todo:
 
    ✔ memory complexity --num of non zeros @done (18-11-26 08:03)
    ✔ wether the matrices are: @done (18-11-26 08:03)
-       ☐ symmetric 
-       ☐ hermitan
+       ✔ symmetric @done (19-02-07 11:03)
+       ✔ hermitan @done (19-02-07 11:03)
              -- If A is Hermitian and full-rank, the basis of eigenvectors may be chosen to be mutually orthogonal. The eigenvalues are real.
-       ☐ positive definite
-       ☐ positive semi definite
+       ✔ positive definite @done (19-02-07 11:03)
+       ✔ positive semi definite @done (19-02-07 11:03)
        
    ------------------------
    ✔ try algo runs with 28 threads @done (18-11-26 08:03)
-   ☐ add plot for 28 threads
-   ☐ compare embedding quality
-   ☐ same embedding as large /small
+   ✔ add plot for 28 threads @done (19-02-07 10:59)
+   ✔ compare embedding quality @done (19-02-07 10:59)
+   ✔ same embedding as large /small @done (19-02-07 10:59)
 
-   ☐ sparse and multithreading
+   ✔ sparse and multithreading @done (19-02-07 11:03)
    ☐ check multithreading compatibility of functions
-
-
    ☐ find out which eigen and svd functions are threads compatible
-   ☐ for flickr and youtube default rank and dim values will not work good
-   ☐ 
+   ✔ for flickr and youtube default rank and dim values will not work good @done (19-02-07 11:03)
 
 
 

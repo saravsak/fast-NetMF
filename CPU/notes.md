@@ -190,6 +190,66 @@
 
     g++ -std=c++11 -march=native netmf_eigen.cpp -o netmf_eigen -I /home/mohit/Documents/boost_1_61_0 -I /home/mohit/Documents/eigen_cpp_installation -I /home/mohit/Documents/spectra_installation/include/Spectra -L /home/mohit/Documents/boost_1_61_0/lib -L /home/mohit/Documents/expat-2.0.1/lib -O3 -DEIGEN_NO_DEBUG -fopenmp  -lboost_graph -lboost_regex -lexpat -lboost_timer -lboost_program_options -lboost_filesystem -lboost_system -Wl,-rpath=/home/mohit/Documents/boost_1_61_0/lib -Wl,-rpath=/home/mohit/Documents/expat-2.0.1/lib
 
+    g++ -std=c++11 -march=native netmf_sparse.cpp -o netmf_sparse -I /home/mohit/Documents/boost_1_61_0 -I /home/mohit/Documents/eigen_cpp_installation -I /home/mohit/Documents/spectra_installation/include/Spectra -L /home/mohit/Documents/boost_1_61_0/lib -L /home/mohit/Documents/expat-2.0.1/lib -O3 -DEIGEN_NO_DEBUG -fopenmp  -lboost_graph -lboost_regex -lexpat -lboost_timer -lboost_program_options -lboost_filesystem -lboost_system -Wl,-rpath=/home/mohit/Documents/boost_1_61_0/lib -Wl,-rpath=/home/mohit/Documents/expat-2.0.1/lib
+    
+    g++ -std=gnu++11 arpack_ng_sample.cpp -o arpack_ng_sample -I /home/mohit/Documents/arpack-ng/install/include/arpack -L /home/mohit/Documents/arpack-ng/install/lib -L /home/mohit/Documents/arpack-ng/SRC/.libs =L /home/mohit/Documents/arpack-ng/UTIL/.libs -Wl,-rpath=/home/mohit/Documents/arpack-ng/install/lib -Wl,-rpath=/home/mohit/Documents/arpack-ng/SRC/.libs -Wl,-rpath=/home/mohit/Documents/arpack-ng/UTIL/.libs 
+
+
+    --- add lapck and openblas links 
+
+    export LD_LIBRARY_PATH=/usr/local/lib:/home/mohit/Documents/boost_1_69_0/link/lib
+    
+    g++ -g -std=c++11 -march=native netmf_sparse.cpp -o netmf_sparse -I /home/mohit/Documents/boost_1_69_0 -I /home/mohit/Documents/eigen_3 -I /home/mohit/Documents/spectra-0.7.0/include/Spectra -L /home/mohit/Documents/boost_1_69_0/link/lib -O3 -DEIGEN_NO_DEBUG -fopenmp  -lboost_graph -lboost_regex -lexpat -lboost_timer -lboost_program_options -lboost_filesystem -lboost_system -Wl,-rpath=/home/mohit/Documents/boost_1_69_0/link/lib
+
+
+
+    arpack c++
+
+    g++ -std=gnu++11 arpack_ng_sample.cpp -o arpack_ng_sample -I/home/mohit/Documents/arpack-ng/link/include/arpack -L/home/mohit/Documents/arpack-ng/link/lib -I/home/mohit/Documents/openmpi-4.0.0/link/include -I/home/mohit/Documents/OpenBLAS/link/include -L/home/mohit/Documents/openmpi-4.0.0/link/lib -L/home/mohit/Documents/OpenBLAS/link/lib -L/home/mohit/Documents/lapack/link -larpack -llapack -lblas -Wl,-rpath=/home/mohit/Documents/openmpi-4.0.0/link/lib -Wl,-rpath=/home/mohit/Documents/OpenBLAS/link/lib -Wl,-rpath=/home/mohit/Documents/lapack/link -Wl,-rpath=/home/mohit/Documents/arpack-ng/link/lib
+
+
+
+    ------------ Updated ----------------------
+
+    Dense:
+        
+        g++ -std=c++11 -march=native netmf_eigen.cpp -o netmf_eigen -I /home/mohit/Documents/boost_1_69_0 -I /home/mohit/Documents/eigen_3 -L /home/mohit/Documents/boost_1_69_0/link/lib -O3 -DEIGEN_NO_DEBUG -fopenmp  -lboost_graph -lboost_regex -lexpat -lboost_timer -lboost_program_options -lboost_filesystem -lboost_system -Wl,-rpath=/home/mohit/Documents/boost_1_69_0/link/lib
+
+
+
+    Sparse - Spectra :
+        g++ -std=c++11 -march=native netmf_sparse.cpp -o netmf_sparse -I /home/mohit/Documents/boost_1_69_0 -I /home/mohit/Documents/eigen_3 -I /home/mohit/Documents/spectra-0.7.0/include/Spectra -L /home/mohit/Documents/boost_1_69_0/link/lib -O3 -DEIGEN_NO_DEBUG -fopenmp  -lboost_graph -lboost_regex -lexpat -lboost_timer -lboost_program_options -lboost_filesystem -lboost_system -Wl,-rpath=/home/mohit/Documents/boost_1_69_0/link/lib
+    
+
+    Sparse - Arpack :
+
+        export LD_LIBRARY_PATH=$HOME/Documents/openmpi-4.0.0/link/lib:$HOME/Documents/OpenBLAS/link/lib:$HOME/Documents/lapack/link:$HOME/Documents/superlu/link/lib:$HOME/Documents/arpack-ng/link/lib:$HOME/Documents/boost_1_69_0/link/lib:$HOME/Documents/armadillo-9.300.2/link/lib
+
+
+        g++ -std=c++11 netmf_sparse_arma.cpp -o netmf_sparse_arma -I$HOME/Documents/boost_1_69_0 -I$HOME/Documents/eigen_3 -I$HOME/Documents/spectra-0.7.0/include/Spectra -I$HOME/Documents/openmpi-4.0.0/link/include -I$HOME/Documents/OpenBLAS/link/include -I$HOME/Documents/superlu/link/include -I$HOME/Documents/lapack/link/include -I$HOME/Documents/arpack-ng/link/include -I$HOME/Documents/armadillo-9.300.2/link/include -L$HOME/Documents/openmpi-4.0.0/link/lib -L$HOME/Documents/boost_1_69_0/link/lib -L$HOME/Documents/OpenBLAS/link/lib -L$HOME/Documents/lapack/link -L$HOME/Documents/superlu/link/lib -L$HOME/Documents/arpack-ng/link/lib -L$HOME/Documents/armadillo-9.300.2/link/lib -O3 -DEIGEN_NO_DEBUG -fopenmp -lboost_graph -lboost_regex -lexpat -lboost_timer -lboost_program_options -lboost_filesystem -lboost_system -larmadillo -lopenblas -larpack -lsuperlu -lboost_chrono -Wl,-rpath=$HOME/Documents/openmpi-4.0.0/link/lib -Wl,-rpath=$HOME/Documents/OpenBLAS/link/lib -Wl,-rpath=$HOME/Documents/lapack/link -Wl,-rpath=$HOME/Documents/superlu/link/lib -Wl,-rpath=$HOME/Documents/arpack-ng/link/lib -Wl,-rpath=$HOME/Documents/armadillo-9.300.2/link/lib -Wl,-rpath=$HOME/Documents/boost_1_69_0/link/lib
+
+
+        *** DO NOT USE $HOME in above command ***
+
+    Sparse - Arpack -- Ri2 -- version;
+
+     
+        export LD_LIBRARY_PATH=$HOME/openmpi-4.0.0/link/lib:$HOME/OpenBLAS/link/lib:$HOME/lapack/link:$HOME/superlu/link/lib:$HOME/arpack-ng/link/lib:$HOME/boost_1_70_0/link/lib:$HOME/armadillo-9.300.2/link/lib
+
+
+        g++ -std=c++11 -march=native netmf_sparse_arma.cpp  -o netmf_sparse_arma -I$HOME/boost_1_70_0 -I$HOME/boost_1_70_0/link/include -I$HOME/eigen335 -I$HOME/spectra/include/Spectra -I$HOME/openmpi-4.0.0/link/include -I$HOME/OpenBLAS/link/include -I$HOME/superlu/link/include -I$HOME/lapack/link/include -I$HOME/arpack-ng/link/include -L$HOME/openmpi-4.0.0/link/lib -L$HOME/boost_1_70_0/link/lib -L$HOME/OpenBLAS/link/lib -L$HOME/lapack/link -L$HOME/superlu/link/lib -L$HOME/arpack-ng/link/lib -I$HOME/armadillo-9.300.2/link/include/ -L$HOME/armadillo-9.300.2/link/lib -O3 -DEIGEN_NO_DEBUG -fopenmp -lboost_graph -lboost_regex -lexpat -lboost_timer -lboost_program_options -lboost_filesystem -lboost_system -larmadillo -lopenblas -larpack -lsuperlu -Wl,-rpath=$HOME/openmpi-4.0.0/link/lib -Wl,-rpath=$HOME/OpenBLAS/link/lib -Wl,-rpath=$HOME/lapack/link -Wl,-rpath=$HOME/superlu/link/lib -Wl,-rpath=$HOME/arpack-ng/link/lib -Wl,-rpath=$HOME/armadillo-9.300.2/link/lib -Wl,-rpath=$HOME/boost_1_70_0/link/lib
+
+# check Embedding quality 
+    
+    My PC:
+
+        from CPU folder 
+
+        export DS=blog
+
+        python ./datasets/predict.py --label ./datasets/$DS/$DS.mat --embedding ./datasets/$DS/embe --matfile-variable-name group --seed 10 --start-train-ratio 10  --stop-train-ratio 90  --num-train-ratio 3  --num-split 5
+
+
 # How command line work
     
     g++
@@ -258,39 +318,253 @@
     6. combining m cap multiplication
     7. remove reverse operation and -ve sign in eigen solved values 
     8. Mcap log max uniary function can be done in place. Check if other fall in this category as well. 
-    9. In RedSVD-h disable V calculation. 
+    9. In RedSVD-h disable V calculation.
+    10. re compile arpack with optimization enabled mpi..  
 
-#
-jangid.6@head ~/work ❯❯❯ sbatch js_24_threads.sh
-Submitted batch job 151662
-jangid.6@head ~/work ❯❯❯ sbatch js_24_threads.sh
-Submitted batch job 151663
-jangid.6@head ~/work ❯❯❯ sbatch js_24_threads.sh
-Submitted batch job 151664
-jangid.6@head ~/work ❯❯❯ sbatch js_24_threads.sh
-Submitted batch job 151665
-jangid.6@head ~/work ❯❯❯ sbatch js_24_threads.sh
-Submitted batch job 151666
-jangid.6@head ~/work ❯❯❯ sbatch js_24_threads.sh
-Submitted batch job 151667
-jangid.6@head ~/work ❯❯❯ squeue -u jangid.6
-             JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)
-            151662     devel ppi_blog jangid.6  R       0:12      1 gpu01
-            151663     devel ppi_blog jangid.6  R       0:09      1 storage03
-            151664     devel ppi_blog jangid.6  R       0:09      1 storage04
-            151665     devel ppi_blog jangid.6  R       0:06      1 storage11
-            151666     devel ppi_blog jangid.6  R       0:06      1 storage12
-            151667     devel ppi_blog jangid.6  R       0:03      1 storage13
+# Wall vs System vs Usr time 
+
+    https://stackoverflow.com/questions/7335920/what-specifically-are-wall-clock-time-user-cpu-time-and-system-cpu-time-in-uni
+
+    https://stackoverflow.com/questions/26398106/how-to-interpret-the-output-of-boosttimercpu-timer-on-multicore-machine
+
+    Wall clock time: time elapsed according to the computer's internal clock, which should match time in the outside world. This has nothing to do with CPU usage; it's given for reference.
+
+    User CPU time and system time: exactly what you think. System calls, which include I/O calls such as read, write, etc. are executed by jumping into kernel code and executing that.
+
+    If wall clock time < CPU time, then you're executing a program in parallel.
+    if two core runs for 5 seconds each then CPU time will be 10 sec. 
+
+    If wall clock time > CPU time, you're waiting for disk, network or other devices.
+
+    https://unix.stackexchange.com/questions/40694/why-real-time-can-be-lower-than-user-time
+    The rule of thumb is:
+
+        real < user: The process is CPU bound and takes advantage of parallel execution on multiple cores/CPUs.
+        real ≈ user: The process is CPU bound and takes no advantage of parallel exeuction.
+        real > user: The process is I/O bound. Execution on multiple cores would be of little to no advantage.
+
+# Installing LAPAC and openblas
+    https://stackoverflow.com/questions/36676449/lapack-blas-openblas-proper-installation-from-source-replace-system-libraries
+
+    lapack http://www.netlib.org/lapack/
+        > 
+        > OepnBlas is already included in it version 
+        > 
+        > install gfortran (sudo apt-get install gfortran)
+        > 
+        > clone git repo https://github.com/Reference-LAPACK/lapack-release
+        > 
+        > type make -- this should include testing as well
+        > 
+        > fixed testing error by https://unix.stackexchange.com/questions/428394/lapack-make-fails-recipe-for-target-znep-out-failed-error 
+        > 
+        > C Wrapper documentation http://www.netlib.org/lapack/lapacke.html 
+        > 
+        > function syntax documentation http://www.netlib.org/lapack/lug/node19.html 
+        > 
+        >  
+    
 
 
-jangid.6@head ~/work ❯❯❯ squeue -u jangid.6
-             JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)
-            151679     batch ppi_blog jangid.6  R       0:59      1 storage04
-            151680     batch ppi_blog jangid.6  R       0:22      1 storage11
-            151681     batch ppi_blog jangid.6  R       0:19      1 storage12
-            151682     batch ppi_blog jangid.6  R       0:14      1 storage13
-            151683     batch ppi_blog jangid.6  R       0:08      1 storage14
-            151684     batch ppi_blog jangid.6  R       0:01      1 storage16
+    openblas https://github.com/xianyi/OpenBLAS
+        make
+        make PREFIX=your_installation_directory install 
 
 
-     
+# Take care of these things 
+    
+    In graphml file the order of nodes should be from 0 to max (in sorted order). Otherwise the embedding quality will fall.
+
+    /home/mohit/Dropbox/spring_2019_MILE_project/netbeans/fast-NetMF/CPU/datasets/edgelist_to_mat_and_graphml.py file will keep the order of graphml nodes in sorted order only when compiling with python2.7
+
+# first success compilation of ARPACK-NG
+    1. Install OpenBLAS https://github.com/xianyi/OpenBLAS
+        make
+        make PREFIX=/home/mohit/Documents/OpenBLAS/link install
+    
+    2. Install openmpi https://www.open-mpi.org/software/ompi/v4.0/
+
+        ./configure --prefix=/home/mohit/Documents/openmpi-4.0.1/link
+        make
+        make PREFIX=$HOME/openmpi-4.0.1/link install
+
+        . add openmpi bin to PATH 
+        ~ ❯❯❯ echo $PATH
+        /usr/local/bin:/usr/local/sbin:/home/mohit/bin:/home/mohit/.local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:$HOME/Documents/openmpi-4.0.0/link/bin
+
+        
+        export PATH=$PATH:$HOME/
+
+
+    3. Install lapack https://github.com/Reference-LAPACK/lapack 
+        change cmake to 
+            
+            mkdir build
+            cd build
+            cmake -DCMAKE_INSTALL_LIBDIR=/home/mohit/Documents/lapack/link -DCMAKE_INSTALL_PREFIX=/home/mohit/Documents/lapack/link -DBUILD_SHARED_LIBS=ON -DLAPACKE=ON .. 
+            cmake --build . --target install
+
+
+            for -- ri2
+            
+            mkdir build
+            cd build
+            cmake -DCMAKE_INSTALL_LIBDIR=$HOME/lapack/link -DCMAKE_INSTALL_PREFIX=$HOME/lapack/link -DBUILD_SHARED_LIBS=ON -DLAPACKE=ON .. 
+            cmake --build . --target install
+    
+    4. Arpack-ng
+
+        https://github.com/opencollab/arpack-ng
+        
+        -- terminal.log will show following data last history
+        1. sh bootstrap
+
+        2. Setup enviroment variables 
+
+        export LDFLAGS="-I/home/mohit/Documents/openmpi-4.0.0/link/include -I/home/mohit/Documents/OpenBLAS/link/include -L/home/mohit/Documents/openmpi-4.0.0/link/lib -L/home/mohit/Documents/OpenBLAS/link/lib -L/home/mohit/Documents/lapack/link -Wl,-rpath=/home/mohit/Documents/openmpi-4.0.0/link/lib -Wl,-rpath=/home/mohit/Documents/OpenBLAS/link/lib -Wl,-rpath=/home/mohit/Documents/lapack/link"
+
+
+        export LOADD="-Wl,-rpath=/home/mohit/Documents/openmpi-4.0.0/link/lib -Wl,-rpath=/home/mohit/Documents/OpenBLAS/link/lib -Wl,-rpath=/home/mohit/Documents/lapack/link"
+
+        export LIBS="-llapack -lblas"
+
+        export LT_SYS_LIBRARY_PATH="/home/mohit/Documents/openmpi-4.0.0/link/lib /home/mohit/Documents/OpenBLAS/link/lib /home/mohit/Documents/lapack/link"
+
+        export PATH="$PATH:/home/mohit/Documents/openmpi-4.0.0/link/bin"
+
+        ./configure --enable-icb --enable-mpi  --enable-shared --with-blas=/home/mohit/Documents/OpenBLAS/link/lib/libopenblas.so -with-lapack=/home/mohit/Documents/lapack/link/liblapack.so --prefix=/home/mohit/Documents/arpack-ng/link
+
+
+
+        For ri2 --
+
+
+        export LDFLAGS="-I$HOME/openmpi-4.0.0/link/include -I$HOME/OpenBLAS/link/include -L$HOME/openmpi-4.0.0/link/lib -L$HOME/OpenBLAS/link/lib -L$HOME/lapack/link -Wl,-rpath=$HOME/openmpi-4.0.0/link/lib -Wl,-rpath=$HOME/OpenBLAS/link/lib -Wl,-rpath=$HOME/lapack/link"
+
+
+        export LOADD="-Wl,-rpath=$HOME/openmpi-4.0.0/link/lib -Wl,-rpath=$HOME/OpenBLAS/link/lib -Wl,-rpath=$HOME/lapack/link"
+
+        export LIBS="-llapack -lblas"
+
+        export LT_SYS_LIBRARY_PATH="$HOME/openmpi-4.0.0/link/lib $HOME/OpenBLAS/link/lib $HOME/lapack/link"
+
+        export PATH="$PATH:$HOME/openmpi-4.0.0/link/bin"
+
+        ./configure --enable-icb --enable-mpi  --enable-shared --with-blas=$HOME/OpenBLAS/link/lib/libopenblas.so -with-lapack=$HOME/lapack/link/liblapack.so --prefix=$HOME/arpack-ng/link
+
+
+        export LD_LIBRARY_PATH="$HOME/openmpi-4.0.0/link/lib:$HOME/OpenBLAS/link/lib:$HOME/lapack/link"
+
+
+        3. make
+        4. make check
+        5. make install
+
+    5. SuperLU (Required for Armagadiilo)
+
+        -- 
+
+
+
+
+        from superlu directory
+
+        1. cp MAKE_INC/make.linux make.inc
+        2. edit make.inc
+            uncomment to following
+            BLASDEF = -DUSE_VENDOR_BLAS
+            BLASLIB = -L/home/mohit/Documents/OpenBLAS/link/lib -lblas
+
+        3. mkdir build; cd build;
+        4. cmake .. -DCMAKE_INSTALL_LIBDIR=/home/mohit/Documents/superlu/link/lib -DCMAKE_INSTALL_PREFIX=/home/mohit/Documents/superlu/link -DCMAKE_INSTALL_INCLUDEDIR=/home/mohit/Documents/superlu/link/include -DBUILD_SHARED_LIBS=ON
+
+
+        for ri2 --
+        module avail
+        module load cmake/3.10.2
+
+        cmake .. -DCMAKE_INSTALL_LIBDIR=$HOME/superlu/link/lib -DCMAKE_INSTALL_PREFIX=$HOME/superlu/link -DCMAKE_INSTALL_INCLUDEDIR=$HOME/superlu/link/include -DBUILD_SHARED_LIBS=ON
+        
+        5. make 
+        6. make install
+        7. make test
+
+    7. Installing boost again on ri2
+
+
+        export LD_LIBRARY_PATH=$HOME/openmpi-4.0.0/link/lib:$HOME/OpenBLAS/link/lib:$HOME/lapack/link:$HOME/superlu/link/lib:$HOME/arpack-ng/link/lib
+        export PATH="$PATH:$HOME/openmpi-4.0.0/link/bin"
+
+        ./bootstrap.sh --prefix=$HOME/boost_1_70_0/link
+        ./b2 install --prefix=$HOME/boost_1_70_0/link
+
+    6. Installing armadillio
+
+        1. 
+
+        export LDFLAGS="-I/home/mohit/Documents/openmpi-4.0.0/link/include -I/home/mohit/Documents/OpenBLAS/link/include -I/home/mohit/Documents/superlu/link/include -I/home/mohit/Documents/lapack/link/include -I/home/mohit/Documents/arpack-ng/link/include -L/home/mohit/Documents/openmpi-4.0.0/link/lib -L/home/mohit/Documents/OpenBLAS/link/lib -L/home/mohit/Documents/lapack/link -L/home/mohit/Documents/superlu/link/lib -L/home/mohit/Documents/arpack-ng/link/lib -Wl,-rpath=/home/mohit/Documents/openmpi-4.0.0/link/lib -Wl,-rpath=/home/mohit/Documents/OpenBLAS/link/lib -Wl,-rpath=/home/mohit/Documents/lapack/link -Wl,-rpath=/home/mohit/Documents/superlu/link/lib -Wl,-rpath=/home/mohit/Documents/arpack-ng/link/lib"
+
+
+        export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/home/mohit/Documents/openmpi-4.0.0/link/lib:/home/mohit/Documents/OpenBLAS/link/lib:/home/mohit/Documents/lapack/link:/home/mohit/Documents/superlu/link/lib:/home/mohit/Documents/arpack-ng/link/lib
+
+
+        rm -f CMakeCache.txt;  cmake -DLAPACK_LIBRARY=/home/mohit/Documents/lapack/link/liblapack.so -DBLAS_LIBRARY=/home/mohit/Documents/lapack/link/libblas.so  -DOpenBLAS_LIBRARY=/home/mohit/Documents/OpenBLAS/link/lib/libopenblas.so -DARPACK_LIBRARY=/home/mohit/Documents/arpack-ng/link/lib/libarpack.so -DSuperLU_LIBRARY=/home/mohit/Documents/superlu/link/lib/libsuperlu.so -DOpenBLAS_INCLUDE_DIR=/home/mohit/Documents/OpenBLAS/link/include -DLAPACK_INCLUDE_DIR=/home/mohit/Documents/lapack/link/include -DARPACK_INCLUDE_DIR=/home/mohit/Documents/arpack-ng/link/include -DSuperLU_INCLUDE_DIR=/home/mohit/Documents/superlu/link/include -DCMAKE_INSTALL_LIBDIR=/home/mohit/Documents/armadillo-9.300.2/link/lib -DCMAKE_INSTALL_PREFIX=/home/mohit/Documents/armadillo-9.300.2/link -DCMAKE_INSTALL_INCLUDEDIR=/home/mohit/Documents/armadillo-9.300.2/link/include -DCMAKE_INSTALL_BINDIR=/home/mohit/Documents/armadillo-9.300.2/link/bin -DBUILD_SHARED_LIBS=ON .
+
+
+        g++ -std=c++11 armadillo_first_simple.cpp -I/home/mohit/Documents/eigen_3 -I/home/mohit/Documents/openmpi-4.0.0/link/include -I/home/mohit/Documents/OpenBLAS/link/include -I/home/mohit/Documents/superlu/link/include -I/home/mohit/Documents/lapack/link/include -I/home/mohit/Documents/arpack-ng/link/include -L/home/mohit/Documents/openmpi-4.0.0/link/lib -L/home/mohit/Documents/OpenBLAS/link/lib -L/home/mohit/Documents/lapack/link -L/home/mohit/Documents/superlu/link/lib -L/home/mohit/Documents/arpack-ng/link/lib -I/home/mohit/Documents/armadillo-9.300.2/link/include/ -L/home/mohit/Documents/armadillo-9.300.2/link/lib -larmadillo -lopenblas -larpack -lsuperlu -Wl,-rpath=/home/mohit/Documents/openmpi-4.0.0/link/lib -Wl,-rpath=/home/mohit/Documents/OpenBLAS/link/lib -Wl,-rpath=/home/mohit/Documents/lapack/link -Wl,-rpath=/home/mohit/Documents/superlu/link/lib -Wl,-rpath=/home/mohit/Documents/arpack-ng/link/lib -Wl,-rpath=/home/mohit/Documents/armadillo-9.300.2/link/lib 
+
+
+        For ri2:
+
+        export LDFLAGS="-I$HOME/openmpi-4.0.0/link/include -I$HOME/OpenBLAS/link/include -I$HOME/superlu/link/include -I$HOME/lapack/link/include -I$HOME/arpack-ng/link/include -L$HOME/openmpi-4.0.0/link/lib -L$HOME/OpenBLAS/link/lib -L$HOME/lapack/link -L$HOME/superlu/link/lib -L$HOME/arpack-ng/link/lib -Wl,-rpath=$HOME/openmpi-4.0.0/link/lib -Wl,-rpath=$HOME/OpenBLAS/link/lib -Wl,-rpath=$HOME/lapack/link -Wl,-rpath=$HOME/superlu/link/lib -Wl,-rpath=$HOME/arpack-ng/link/lib"
+
+
+        export LD_LIBRARY_PATH=$HOME/openmpi-4.0.0/link/lib:$HOME/OpenBLAS/link/lib:$HOME/lapack/link:$HOME/superlu/link/lib:$HOME/arpack-ng/link/lib
+
+        rm -f CMakeCache.txt;  cmake -DLAPACK_LIBRARY=$HOME/lapack/link/liblapack.so -DBLAS_LIBRARY=$HOME/lapack/link/libblas.so  -Dopenblas_LIBRARY=$HOME/OpenBLAS/link/lib/libopenblas.so -DARPACK_LIBRARY=$HOME/arpack-ng/link/lib/libarpack.so -DSuperLU_LIBRARY=$HOME/superlu/link/lib/libsuperlu.so -DOpenBLAS_INCLUDE_DIR=$HOME/OpenBLAS/link/include -DLAPACK_INCLUDE_DIR=$HOME/lapack/link/include -DARPACK_INCLUDE_DIR=$HOME/arpack-ng/link/include -DSuperLU_INCLUDE_DIR=$HOME/superlu/link/include -DCMAKE_INSTALL_LIBDIR=$HOME/armadillo-9.300.2/link/lib -DCMAKE_INSTALL_PREFIX=$HOME/armadillo-9.300.2/link -DCMAKE_INSTALL_INCLUDEDIR=$HOME/armadillo-9.300.2/link/include -DCMAKE_INSTALL_BINDIR=$HOME/armadillo-9.300.2/link/bin -DBUILD_SHARED_LIBS=ON .
+
+
+
+
+
+
+# Speeding up from Arpack-ng
+        
+    -- use parallel superlu version https://crd-legacy.lbl.gov/~xiaoye/SuperLU/
+    -- user parallel arpack-ng version -lparpack
+        
+
+# sparse matrix eigen values using arpack
+    Links
+    -----
+
+    https://scicomp.stackexchange.com/questions/26786/eigen-max-and-minimum-eigenvalues-of-a-sparse-matrix
+
+
+# armagallio eigen decomposition
+    sparse matrix creation http://arma.sourceforge.net/docs.html#SpMat
+
+    dense matrix initilialization http://arma.sourceforge.net/docs.html#element_initialisation
+
+
+
+
+    todos:
+       > check floating point precision..only 4 decimals are being printed http://arma.sourceforge.net/docs.html#raw_print
+
+
+# paper talk
+    1. What will my number speak for april 10th
+       conversion cost
+
+    2. other deadlines
+    3. 
+
+
+--> get single node from ri2, let only your code run
+--> email jon smith for deadline
+ 
+
+
+
+

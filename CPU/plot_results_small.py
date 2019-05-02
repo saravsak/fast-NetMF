@@ -67,7 +67,7 @@ def stacked_bar(data, series_labels, category_labels=None,
 
 # https://docs.scipy.org/doc/numpy-1.13.0/reference/arrays.dtypes.html
 # https://jakevdp.github.io/PythonDataScienceHandbook/04.08-multiple-subplots.html
-data_array= np.loadtxt("/home/mohit/Dropbox/spring_2019_MILE_project/netbeans/fast-NetMF/CPU/6_run_set/averaged_wave2.csv", dtype=np.dtype([('dataset', 'U50'),
+data_array= np.loadtxt("/home/mohit/Dropbox/spring_2019_MILE_project/netbeans/fast-NetMF/CPU/results_sparse_matrices/averaged.csv", dtype=np.dtype([('dataset', 'U50'),
                                                           
  ('graph_size','U50'),
                                                            ('step','U100'),

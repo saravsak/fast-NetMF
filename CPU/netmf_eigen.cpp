@@ -24,6 +24,11 @@
 #include <boost/filesystem.hpp>
 #include <boost/regex.hpp>
 
+
+// #define PRINT_MATRICES
+// #define PRINT_ALGO_PARAMS
+#define PRINT_EXECUTION_TIME
+
 namespace fs = boost::filesystem;
 using namespace boost;
 using namespace boost::timer;
@@ -31,7 +36,7 @@ using namespace Eigen;
 using namespace std;
 
 
-int window_size = 10;
+unsigned long long int window_size;
 string print_prefix = "";
 
 void print_timer(const string &message, cpu_timer &timer)
@@ -49,7 +54,7 @@ void print_timer(const string &message, cpu_timer &timer)
 	// std::cout << std::right << std::setw(40) << message << std::right << std::setw(15) << (wall - last_wall) << " sec wall, " << std::right << std::setw(10) << (cpu - last_cpu) <<  " sec cpu,  Acc: " << std::right << std::setw(15) << wall << "sec wall, " <<  std::right << std::setw(10) <<  cpu << "sec cpu" << endl ;
 
 	// this is good for storing into csv
-	std::cout << print_prefix << ",, " << message << ",, " << (wall - last_wall) << ",, " << (cpu - last_cpu) << ",, " << wall << ",, " <<  cpu  << endl ;
+	std::cout << print_prefix << "," << message << "," << (wall - last_wall) << "," << (cpu - last_cpu) << "," << wall << "," <<  cpu  << endl ;
 
 	last_wall = wall;
 	last_cpu = cpu;
@@ -72,7 +77,9 @@ float summation_approximate(float x)
 		return 1 ;
 	else
 		//https://en.cppreference.com/w/c/numeric/math/pow
-		return max((float)0, x * (1 - powf(x, window_size)) / ((1 - x) * window_size ));
+		return max((float)0, (x * (1 - powf(x, ::window_size))) / ((1 - x) * ::window_size ) );
+
+	     // (.143883 * (1 - pow(.143883,10)))/ ((1-.143883)*10) = 0.01680646447306298
 }
 
 
@@ -131,10 +138,17 @@ MatrixXf netmf(MatrixXf &A, const string &graph_size, unsigned long long int ran
 
 	// cout << "degree vec sqrt"  << endl << degree_vec.sqrt().inverse() << endl;
 
+	
+	#ifdef PRINT_MATRICES
+	cout << "\nVol of matrix A is\n------------------------------\n" << vol << endl;
+	#endif /* PRINT_MATRICES */
+
 	// There are two ways to create Diagonal matrix
 
 	// Type 1
 	// the special Diagonal matrix class. stores only diagonals
+
+
 
 	DiagonalMatrix<float, Dynamic> D_invsqrt(num_nodes);
 	D_invsqrt.diagonal() << degree_vec.sqrt().inverse();
@@ -155,7 +169,26 @@ MatrixXf netmf(MatrixXf &A, const string &graph_size, unsigned long long int ran
 	MatrixXf norm_adj;
 	norm_adj.noalias() = D_invsqrt * A * D_invsqrt;
 	// cout << "normalized adjacency matrix " << endl << norm_adj  << endl;
+
+	#ifdef PRINT_MATRICES
+	cout << "\nAdj norm\n------------------------\n" << endl << norm_adj  << endl;
+	#endif /* PRINT_MATRICES */	
+
+	// X.todense()
+	// matrix([[0.        , 0.40824829, 0.57735027, 0.        ],
+	//         [0.40824829, 0.        , 0.35355339, 0.        ],
+	//         [0.57735027, 0.35355339, 0.        , 0.5       ],
+	//         [0.        , 0.        , 0.5       , 0.        ]])
+
+	// 0 0.408248 0.57735 0 
+	// 0.408248 0 0.353553 0 
+	// 0.57735 0.353553 0 0.5 
+	// 0 0 0.5 0 
+
+	#ifdef PRINT_EXECUTION_TIME	
 	print_timer("Normalized Adjacency Matrix", timer);
+	#endif /* PRINT_EXECUTION_TIME */
+
 
 
 	MatrixXf M_cap;
@@ -172,13 +205,22 @@ MatrixXf netmf(MatrixXf &A, const string &graph_size, unsigned long long int ran
 		// cout << "The eigenvalues of adj_norm are:" << endl << es.eigenvalues() << endl;
 		// cout << "The matrix of eigenvectors, adj_norm, is:" << endl << es.eigenvectors() << endl << endl;
 
+	    #ifdef PRINT_EXECUTION_TIME
 		print_timer("Eigen Decomposition" , timer);
+    	#endif /* PRINT_EXECUTION_TIME */
 
 		// reduction to top rank values
 		// see quick reference http://eigen.tuxfamily.org/dox/group__QuickRefPage.html#QuickRef_DiagTriSymm
 
 
 		// cout << "The top rank eigenvalues of adj_norm are:" << endl << es.eigenvalues().tail(rank) << endl;
+
+    	#ifdef PRINT_MATRICES
+    	cout << "\nEigen vals and vecs\n------------------------\n";
+    	std::cout << "\neval\n" <<es.eigenvalues().reverse().transpose() << std::endl;
+    	std::cout << "\nevec\n"<< ( es.eigenvectors().rowwise().reverse()) << std::endl;
+    	// cout << "summation_approximate :" << endl <<  ( ArrayXf) eigs.eigenvalues().reverse().unaryExpr(ptr_fun(summation_approximate)) << endl;
+		#endif /* PRINT_MATRICES */	
 
 		// slicing top rank
 		MatrixXf e_vec_M_h = es.eigenvectors().rightCols(rank) ;
@@ -201,8 +243,7 @@ MatrixXf netmf(MatrixXf &A, const string &graph_size, unsigned long long int ran
 
 		M_cap.noalias() = (float)(vol / (double) negative_sampling) * (temp_m * temp_m.transpose());
 
-		// cout << "approximated M is " << endl << M_cap << endl ;
-		print_timer("Approximated M" , timer);
+
 
 
 	}
@@ -213,7 +254,7 @@ MatrixXf netmf(MatrixXf &A, const string &graph_size, unsigned long long int ran
 		MatrixXf S = MatrixXf::Zero(num_nodes, num_nodes);
 		MatrixXf X = MatrixXf::Identity(num_nodes, num_nodes);
 
-		for (int i = 0; i < window_size; ++i)
+		for (int i = 0; i < ::window_size; ++i)
 		{
 			X *= norm_adj;
 			S += X;
@@ -222,35 +263,56 @@ MatrixXf netmf(MatrixXf &A, const string &graph_size, unsigned long long int ran
 		}
 
 		// cout << "Summed norm_adj " << endl << S << endl ;
+		#ifdef PRINT_MATRICES
+		cout << "\nSummed norm_adj\n---------------------------------\n" << S << endl ;
+		#endif /* PRINT_MATRICES */	
+
+		#ifdef PRINT_EXECUTION_TIME	
 		print_timer("Summed Norm_adj" , timer);
+		#endif /* PRINT_EXECUTION_TIME */
 
 
-		M_cap.noalias() = (float)( vol / ((double)(window_size * negative_sampling)) ) * (D_invsqrt * (D_invsqrt * S).transpose());
+		M_cap.noalias() = (float)( vol / ((double)(::window_size * negative_sampling)) ) * (D_invsqrt * (D_invsqrt * S).transpose());
 		// cout << "approximated M is " << endl << M_cap << endl ;
-		print_timer("Approximated M" , timer);
-		\
+		
+		
 	}
 	// element wise log and maximum (each element, 1)
 
-	MatrixXf M_cap_2 = M_cap.unaryExpr(ptr_fun(log_max_each_vs_1));
+	M_cap = M_cap.unaryExpr(ptr_fun(log_max_each_vs_1));
 
-	// cout << "M_cap_2 after log max is " << endl << M_cap_2 << endl ;
+	
+	#ifdef PRINT_MATRICES
+	cout << "\nMcap \n------------------------\n"  << M_cap << endl ;
+	#endif /* PRINT_MATRICES */	
 
-	//----------------------------------------------------------------------------------------
+	#ifdef PRINT_EXECUTION_TIME	
+	print_timer("Approximated M" , timer);
+	#endif /* PRINT_EXECUTION_TIME */
 
 	// SVD calculation
 	//https://eigen.tuxfamily.org/dox/classEigen_1_1BDCSVD.html
 	//https://stats.stackexchange.com/questions/50663/what-is-a-thin-svd
 
-// 
+	// 
 
-	BDCSVD<MatrixXf> svd(M_cap_2, ComputeFullU);
+	BDCSVD<MatrixXf> svd(M_cap, ComputeFullU);
 
 	// the results are stored in particular members as shown https://eigen.tuxfamily.org/dox/classEigen_1_1JacobiSVD.html
 
 	// cout << "Singular Values are " << endl << svd.singularValues() << endl ;
 	// cout << "Computed U  is " << endl << svd.matrixU() << endl ;
+	
+	#ifdef PRINT_MATRICES
+	// the results are stored in particular members as shown https://eigen.tuxfamily.org/dox/classEigen_1_1JacobiSVD.html
+	cout << "\nSingular Values and U are\n------------------------\n";
+	cout << "\nSingular Values are " << endl << svd.singularValues().transpose() * perm << endl ;
+	cout << "\nComputed U  is " << endl << svd.matrixU() * perm << endl ;
+	#endif /* PRINT_MATRICES */	
+
+	#ifdef PRINT_EXECUTION_TIME	
 	print_timer("SVD" , timer);
+	#endif /* PRINT_EXECUTION_TIME */
 
 
 	MatrixXf U_d = svd.matrixU().leftCols(dim);
@@ -274,9 +336,9 @@ int main(int argc, char *argv[])
 		fs::path dataset_folder;
 		unsigned long long int rank;
 		unsigned long long int dim;
-		unsigned long long int window_size;
 		float negative_sampling;
 		std::string graph_size;
+		std::string embedding_file_name_suffix;
 
 
 		program_options::options_description desc{"Options"};
@@ -288,10 +350,11 @@ int main(int argc, char *argv[])
 		// default options
 		("rank,r"              , program_options::value<unsigned long long int>(&rank)->default_value(256) , "#eigenpairs used to approximate normalized graph laplacian.")
 		("dim,d"               , program_options::value<unsigned long long int>(&dim)->default_value(128) , "dimension of embedding")
-		("window,w"            , program_options::value<unsigned long long int>(&window_size)->default_value(10) , "context window size")
+		("window,w"            , program_options::value<unsigned long long int>(&::window_size)->default_value(10) , "context window size")
 		("negative_sampling,n" , program_options::value<float>(&negative_sampling)->default_value(1.0) , "negative sampling")
-		("graph_size,s"        , program_options::value<std::string>(&graph_size)->default_value("large") , "netmf large or small algorithm (e.g. small/large )");
-
+		("graph_size,s"        , program_options::value<std::string>(&graph_size)->default_value("large") , "netmf large or small algorithm (e.g. small/large )")
+		("embedding_file_name_suffix,es"        , program_options::value<std::string>(&embedding_file_name_suffix)->default_value("") , "Optional suffix to add in embedding_file_name for miscellaneous purpose");
+        
 
 		program_options::command_line_parser parser{argc, argv};
 		parser.options(desc).allow_unregistered();
@@ -309,13 +372,18 @@ int main(int argc, char *argv[])
 		program_options::notify(vm); // throws on error, so do after help in case
 		// there are any problems
 
-		// std::cout << "dataset_name : " << dataset_name << std::endl;
-		// std::cout << "rank : " << rank << std::endl;
-		// std::cout << "dim : " << dim << std::endl;
-		// std::cout << "window_size : " << window_size << std::endl;
-		// std::cout << "negative_sampling : " << negative_sampling << std::endl;
-		// std::cout << "graph_size : " << graph_size << std::endl;
 
+
+		#ifdef PRINT_ALGO_PARAMS
+
+		std::cout << "dataset_name : " << dataset_name << std::endl;
+		std::cout << "rank : " << rank << std::endl;
+		std::cout << "dim : " << dim << std::endl;
+		std::cout << "window_size : " << ::window_size << std::endl;
+		std::cout << "negative_sampling : " << negative_sampling << std::endl;
+		std::cout << "graph_size : " << graph_size << std::endl;
+
+		#endif /* PRINT_ALGO_PARAMS */
 
 		typedef adjacency_list<vecS, vecS, undirectedS, no_property, EdgeProperties > Graph;
 		boost::dynamic_properties dp;
@@ -356,9 +424,11 @@ int main(int argc, char *argv[])
 		// cout << "Num Threads :" << Eigen::nbThreads( ) << endl; 
 
 
-		print_prefix = boost::regex_replace(dataset_name.string(), boost::regex(".graphml"), "") + ",, " + graph_size + ",, " + to_string(Eigen::nbThreads( ));
+		print_prefix = boost::regex_replace(dataset_name.string(), boost::regex(".graphml"), "") + "," + graph_size + "," + to_string(Eigen::nbThreads( )) + "," + to_string(::window_size)  + "," + to_string(dim) + "," + to_string(embedding_file_name_suffix) ;
 
+		#ifdef PRINT_EXECUTION_TIME		
 		print_timer("Graph Loaded from file", timer);
+        #endif /* PRINT_EXECUTION_TIME */
 
 		MatrixXf A =  MatrixXf::Zero(num_nodes, num_nodes);
 		graph_traits<Graph>::edge_iterator ei, ei_end;
@@ -376,12 +446,50 @@ int main(int argc, char *argv[])
 		}
 
 
-		MatrixXf network_embedding(num_nodes, dim);
-		network_embedding = netmf(A, graph_size, rank, negative_sampling, dim, num_nodes, timer);
-		// cout << "Final Embeddings are :" << endl << network_embedding << endl ;
-		print_timer("Embedding Ready" , timer);
+		#ifdef PRINT_ALGO_PARAMS
 
-		string embedding_file_name = boost::regex_replace(dataset_name.string(), boost::regex(".graphml"), "") + "_" + graph_size + "_" + to_string(Eigen::nbThreads( )) + ".embedding"; 
+		cout << "num Edges:" << boost::num_edges(g) << endl;
+		cout << "num Nodes:" << boost::num_vertices(g) << endl;
+		cout << "Num Threads :" << Eigen::nbThreads( ) << endl; 
+		#endif /* PRINT_ALGO_PARAMS */
+
+
+		#ifdef PRINT_MATRICES
+		cout << "\nA\n-----------------------\n"  << A << endl ;
+		#endif /* PRINT_MATRICES */		
+
+		// Nonzero entries:
+		// (1,1) (2,2) (1,0) (1,2) (2,0) (1,1) (1,3) (1,2) 
+
+		// Outer pointers:
+		// 0 2 4 7  $
+
+		// 0 1 2 0 
+		// 1 0 1 0 
+		// 2 1 0 1 
+		// 0 0 1 0 
+
+		
+
+		MatrixXf network_embedding(num_nodes, dim+1);
+		network_embedding << VectorXf::LinSpaced(num_nodes,0,num_nodes-1), netmf(A, graph_size, rank, negative_sampling, dim, num_nodes, timer);
+
+
+
+		#ifdef PRINT_MATRICES
+		cout << "\nFinal Embeddings\n------------------------------\n" <<  network_embedding.rightCols(dim) << endl ;
+		#endif /* PRINT_MATRICES */	
+		
+		#ifdef PRINT_EXECUTION_TIME	
+		print_timer("Embedding Ready" , timer);
+		#endif /* PRINT_EXECUTION_TIME */
+
+		if(embedding_file_name_suffix != "") // use has provided a value
+			embedding_file_name_suffix = "_" + embedding_file_name_suffix;
+
+			
+		string embedding_file_name = boost::regex_replace(dataset_name.string(), boost::regex(".graphml"), "") + "_dense_eigen_algo_" + graph_size + "_win" + to_string(::window_size) + "_emdDim" + to_string(dim) + "_numThreads" + to_string(Eigen::nbThreads( )) +  embedding_file_name_suffix + ".embedding"; 
+
 
 		fs::path embedding_file_path =  dataset_folder / fs::path(embedding_file_name) ;
 		std::ofstream file(embedding_file_path.string());
@@ -391,6 +499,7 @@ int main(int argc, char *argv[])
 			
 			
 			IOFormat space_separated(FullPrecision, DontAlignCols, " ", "\n", "", "", "", "");
+			file << num_nodes << " " << dim << "\n";
 			file << network_embedding.format(space_separated) ;
 		} else {
 
@@ -398,8 +507,9 @@ int main(int argc, char *argv[])
 
 		}
 
+		#ifdef PRINT_EXECUTION_TIME
 		print_timer("Embedding Written to file", timer);
-
+		#endif /* PRINT_EXECUTION_TIME */
 
 		// // small dim 2 
 

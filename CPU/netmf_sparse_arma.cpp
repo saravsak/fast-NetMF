@@ -25,6 +25,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/regex.hpp>
 #include "RedSVD-h"
+#include <armadillo>
 
 #include <SymEigsSolver.h>
 #include <MatOp/SparseGenMatProd.h>
@@ -90,10 +91,6 @@ float summation_approximate(float x)
 
 	     // (.143883 * (1 - pow(.143883,10)))/ ((1-.143883)*10) = 0.01680646447306298
 }
-	
-
-
-
 
 // define function to be applied coefficient-wise
 float log_max_each_vs_1(float x)
@@ -189,90 +186,92 @@ MatrixXf netmf(Eigen::SparseMatrix<float> &A, const string &graph_size, unsigned
 	print_timer("b_Normalized Adjacency Matrix", timer);
 	#endif /* PRINT_EXECUTION_TIME */
 
+	
+    arma::Col<float>  values = arma::Col<float>(norm_adj.valuePtr(), norm_adj.nonZeros(),false, false);
+
+    long long unsigned int nnz = norm_adj.nonZeros();
+
+    // arma::Col<arma::uword> row_indices = arma::Col<arma::uword>((Eigen::Vector(long long unsigned int))norm_adj.innerIndexPtr(), norm_adj.nonZeros(),false, false);
+    arma::Col<arma::uword> row_indices(nnz);
+    for(long long unsigned int i=0; i< nnz ; i++ ){
+    	row_indices(i) = (long long unsigned int) norm_adj.innerIndexPtr()[i];
+		
+	} 
+    
+    // arma::Col<arma::uword> col_ptr = arma::Col<arma::uword>((long long unsigned int*)norm_adj.outerIndexPtr(), num_nodes+1 ,false, false);
+    arma::Col<arma::uword> col_ptr(num_nodes+1);
+    for(long long unsigned int i=0; i< num_nodes+1 ; i++ ){
+    	col_ptr(i) = (long long unsigned int) norm_adj.outerIndexPtr()[i];
+		
+	} 
+
+	arma::SpMat<float> arma_norm_adj = arma::SpMat<float>( row_indices, col_ptr, values, num_nodes, num_nodes);
+
 	MatrixXf M_cap(num_nodes, num_nodes);
 	M_cap.setZero();
 	// Approximate M cap
 
 	if (graph_size == "large") {
 
-		    // Construct matrix operation object using the wrapper class SparseGenMatProd
-		    SparseGenMatProd<float> op(norm_adj);
-		    // SparseSymShiftSolve<float> op(norm_adj);
+		   
+		   arma::Col<float> eigval;
+		   arma::Mat<float> eigvec;
 
-
-		     // https://spectralib.org/doc/classspectra_1_1symeigssolver
-		    // look at above site for 3rd parameter
-		    // Construct eigen solver object, requesting the largest three eigenvalues
-
-		    unsigned long long int convergence_controller = (unsigned long long int) (2.1*rank); 
-		    if ( convergence_controller_by_user != 0){ // user wants to overide autmatic values of convergence controller
-		    	convergence_controller = convergence_controller_by_user;	
-		    }
-
-		    // checking for maximum value 
-		    if ( convergence_controller > num_nodes ){
-		    	convergence_controller = num_nodes;
-		    } 
-
-		    // cout<< "convergence_controller used : " << convergence_controller << endl ;	
-
-		    SymEigsSolver< float, LARGEST_ALGE, SparseGenMatProd<float>> eigs(&op, rank, convergence_controller);
-		    // SymEigsShiftSolver< float, LARGEST_ALGE, SparseSymShiftSolve<float> > eigs(&op, rank, convergence_controller, -1e-6);
-		    
-		    // Initialize and compute
-		    eigs.init();
-		    int nconv = eigs.compute();
-
-
+		   arma::eigs_sym(eigval, eigvec, arma_norm_adj, rank, "la");  // find 2 eigenvalues/eigenvectors
+		   
 		    // diagonalized  eigen values
 			DiagonalMatrix<float, Dynamic> evals_diag(rank);
-
-			
-		    if(eigs.info() == SUCCESSFUL){
+	
 		
-		    	#ifdef PRINT_MATRICES
-		    	cout << "\nEigen vals and vecs\n------------------------\n";
-		    	std::cout << "\neval\n" <<eigs.eigenvalues().reverse().transpose() << std::endl;
-		    	std::cout << "\nevec\n"<< ( eigs.eigenvectors().rowwise().reverse()) << std::endl;
-		    	// cout << "summation_approximate :" << endl <<  ( ArrayXf) eigs.eigenvalues().reverse().unaryExpr(ptr_fun(summation_approximate)) << endl;
-				#endif /* PRINT_MATRICES */	
-				
+	    	#ifdef PRINT_MATRICES
+	    	cout << "\nEigen vals and vecs\n------------------------\n";
+		   	std::cout << "\neval\n" <<eigval << std::endl;
+		   	std::cout << "\nevec\n"<< eigvec << std::endl;
+		   	// cout << "summation_approximate :" << endl <<  ( ArrayXf) eigs.eigenvalues().reverse().unaryExpr(ptr_fun(summation_approximate)) << endl;
+			#endif /* PRINT_MATRICES */	
+			
 
-			    #ifdef PRINT_EXECUTION_TIME
-				print_timer("c_Eigen Decomposition" , timer);
-				 #endif /* PRINT_EXECUTION_TIME */
-
-
-		        evals_diag.diagonal() << ( ( ArrayXf) eigs.eigenvalues().reverse().unaryExpr(ptr_fun(summation_approximate))).sqrt();
-		    	// sqrt(.01680654) = 0.1296400401110706
-
-		    	MatrixXf temp_m;
-		    	temp_m = (evals_diag * (D_invsqrt * ( eigs.eigenvectors().rowwise().reverse())).transpose()).transpose();
-
-		    	// this is euivalent to X in python approximate_deepwalk_matrix
-		    	// cout << "temp_m is " << endl << temp_m << endl ;
-
-		    	M_cap.triangularView<Upper>() = (temp_m * temp_m.transpose()); 
-		    	// cout << "M_cap 1 " << endl << M_cap << endl ;
-
-		    	// M_cap 1 
-		    	// 0.0958865 0.0972709 0.0959404  0.092966
-		    	//         0 0.0988534 0.0967741 0.0925995
-		    	//         0         0 0.0977003 0.0983051
-		    	//         0         0         0  0.106518
-		    	M_cap.triangularView<Upper>() = (float)(vol / (float) negative_sampling) * M_cap;
+		    #ifdef PRINT_EXECUTION_TIME
+			print_timer("c_Eigen Decomposition" , timer);
+			 #endif /* PRINT_EXECUTION_TIME */
 
 
-		    }else{
+	        Eigen::ArrayXf eeigval(rank);
 
-				throw "Eigen Values and vector could not be solved.";
-		    }
+            Eigen::MatrixXf eeigvec(num_nodes, rank);
+            
+            for(long long unsigned int i=0; i< rank ; i++ ){
+                eeigval(i) = (float)  eigval(i);      
+            }
+
+            for(long long unsigned int i=0; i< num_nodes ; i++ ){
+                for(long long unsigned int j=0; j< rank ; j++ ){
+                eeigvec(i,j) = (float)  eigvec(i,j); 
+                }     
+            }   
+
+            evals_diag.diagonal() << (  eeigval.unaryExpr(ptr_fun(summation_approximate))).sqrt();
+
+            MatrixXf temp_m;
+            temp_m = (evals_diag * (D_invsqrt * (eeigvec)).transpose()).transpose();
+
+	    	// this is euivalent to X in python approximate_deepwalk_matrix
+	    	// cout << "temp_m is " << endl << temp_m << endl ;
+
+	    	M_cap.triangularView<Upper>() = (temp_m * temp_m.transpose()); 
+	    	// cout << "M_cap 1 " << endl << M_cap << endl ;
+
+	    	// M_cap 1 
+	    	// 0.0958865 0.0972709 0.0959404  0.092966
+	    	//         0 0.0988534 0.0967741 0.0925995
+	    	//         0         0 0.0977003 0.0983051
+	    	//         0         0         0  0.106518
+	    	M_cap.triangularView<Upper>() = (float)(vol / (float) negative_sampling) * M_cap;
+
 
 			// element wise log and maximum (each element, 1)
 			// this is equivalent to Y in approximate_deepwalk_matrix
-
-
-		    	
+	    	
 			M_cap.triangularView<Upper>() = M_cap.unaryExpr(ptr_fun(log_max_each_vs_1));
 		    	// cout << "M_cap 2 " << endl << M_cap << endl ;
 
@@ -288,9 +287,8 @@ MatrixXf netmf(Eigen::SparseMatrix<float> &A, const string &graph_size, unsigned
 		MatrixXf S = MatrixXf::Zero(num_nodes, num_nodes);
 		MatrixXf X = MatrixXf::Identity(num_nodes, num_nodes);
 
-
-		for (unsigned long long int  i = 0; i < ::window_size; ++i)
-		{	
+		for (unsigned long long int  i = 0; i < window_size; ++i)
+		{
 			X = X * norm_adj;
 			S += X;
 
@@ -298,11 +296,11 @@ MatrixXf netmf(Eigen::SparseMatrix<float> &A, const string &graph_size, unsigned
 		}
 
 		#ifdef PRINT_MATRICES
-		cout << "\nSummed norm_adj\n---------------------------------\n" << S << endl ;
+		cout << "\nc_Summed norm_adj\n---------------------------------\n" << S << endl ;
 		#endif /* PRINT_MATRICES */	
 
 		#ifdef PRINT_EXECUTION_TIME	
-		print_timer("c_Summed Norm_adj" , timer);
+		print_timer("Summed Norm_adj" , timer);
 		#endif /* PRINT_EXECUTION_TIME */
 
 		// M_cap = D_invsqrt * (D_invsqrt * S).transpose()
@@ -499,7 +497,9 @@ int main(int argc, char *argv[])
 		{
 
 			// A(index[source(*ei, g)], index[target(*ei, g)]) = g[*ei].weight;
-			// A( index[target(*ei, g)], index[source(*ei, g)]) = g[*ei].weight;					
+			// A( index[target(*ei, g)], index[source(*ei, g)]) = g[*ei].weight;
+
+					
 
 			tripletList.push_back(T(index[source(*ei, g)], index[target(*ei, g)], g[*ei].weight));
 			tripletList.push_back(T( index[target(*ei, g)], index[source(*ei, g)], g[*ei].weight));
@@ -554,14 +554,14 @@ int main(int argc, char *argv[])
 			embedding_file_name_suffix = "_" + embedding_file_name_suffix;
 
 			
-		string embedding_file_name = boost::regex_replace(dataset_name.string(), boost::regex(".graphml"), "") + "_sparse_spectra_algo_" + graph_size + "_win" + to_string(::window_size) + "_emdDim" + to_string(dim) + "_numThreads" + to_string(Eigen::nbThreads( )) +  embedding_file_name_suffix + ".embedding"; 
+		string embedding_file_name = boost::regex_replace(dataset_name.string(), boost::regex(".graphml"), "") + "_sparse_arma_algo_" + graph_size + "_win" + to_string(::window_size) + "_emdDim" + to_string(dim) + "_numThreads" + to_string(Eigen::nbThreads( )) +  embedding_file_name_suffix + ".embedding"; 
 
 		fs::path embedding_file_path =  dataset_folder / fs::path(embedding_file_name) ;
 		std::ofstream file(embedding_file_path.string());
 
 		if (file.is_open())
 		{			
-
+			
 			IOFormat space_separated(FullPrecision, DontAlignCols, " ", "\n", "", "", "", "");
 			file << num_nodes << " " << dim << "\n";
 			file << network_embedding.format(space_separated) ;
